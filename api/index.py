@@ -8,12 +8,17 @@ from pydantic import BaseModel
 app = FastAPI()
 
 #for local test put real Client_ID from Strava
-#STRAVA_CLIENT_ID = "XXXXXX"
+#STRAVA_CLIENT_ID = "xxx"
 
+# STRAVA_REDIRECT_URI = (
+    # "http://localhost:8000/auth/strava/callback"
+# )
+
+#For Vercel Production
 STRAVA_CLIENT_ID = os.getenv("STRAVA_CLIENT_ID")
 
 STRAVA_REDIRECT_URI = (
-    "https://strava-malborska-dashboard.vercel.app/auth/strava/callback"
+   "https://strava-malborska-dashboard.vercel.app/auth/strava/callback"
 )
 
 class StatusResponse(BaseModel):
@@ -43,7 +48,7 @@ def auth_strava():
         "&response_type=code"
         f"&redirect_uri={STRAVA_REDIRECT_URI}"
         "&approval_prompt=force"
-        "&scope=read"
+        "&scope=read,activity:read"
     )
 
     return RedirectResponse(url=url)
@@ -56,9 +61,31 @@ def strava_callback(code: str):
         data={
             "client_id": os.getenv("STRAVA_CLIENT_ID"),
             "client_secret": os.getenv("STRAVA_CLIENT_SECRET"),
+            # "client_id": "xxx",
+            # "client_secret": "xxx",
             "code": code,
             "grant_type": "authorization_code"
         }
+    )
+
+    return response.json()
+
+@app.get("/activities")
+def activities():
+
+#Lokalne testowanie
+    #access_token = "xxx"
+
+    access_token = os.getenv("STRAVA_ACCESS_TOKEN")
+
+    headers = {
+        #"Authorization": f"Bearer xxx"
+        "Authorization": f"Bearer {access_token}"
+    }
+
+    response = requests.get(
+        "https://www.strava.com/api/v3/athlete/activities",
+        headers=headers
     )
 
     return response.json()
