@@ -66,4 +66,4 @@ def strava_callback(code: str):
 #    return {
 #        "status": "oauth_success",
 #        "authorization_code": code
-    }
+#    }
