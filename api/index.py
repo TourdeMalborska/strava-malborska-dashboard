@@ -1,4 +1,5 @@
 import os
+import requests
 
 from fastapi import FastAPI
 from fastapi.responses import Response, RedirectResponse
@@ -50,7 +51,19 @@ def auth_strava():
 @app.get("/auth/strava/callback")
 def strava_callback(code: str):
 
-    return {
-        "status": "oauth_success",
-        "authorization_code": code
+    response = requests.post(
+        "https://www.strava.com/oauth/token",
+        data={
+            "client_id": os.getenv("STRAVA_CLIENT_ID"),
+            "client_secret": os.getenv("STRAVA_CLIENT_SECRET"),
+            "code": code,
+            "grant_type": "authorization_code"
+        }
+    )
+
+    return response.json()
+
+#    return {
+#        "status": "oauth_success",
+#        "authorization_code": code
     }
