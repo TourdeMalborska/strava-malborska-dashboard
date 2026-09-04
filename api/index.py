@@ -16,7 +16,8 @@ from config import (
     supabase
 )
 
-from strava import refresh_access_token
+#from strava import refresh_access_token
+from strava import refresh_athlete_token
 
 #load_dotenv()
 
@@ -173,6 +174,42 @@ def activities():
 #        "status": "oauth_success",
 #        "authorization_code": code
 #    }
+# @app.get("/test-refresh")
+# def test_refresh():
+
+    # athlete = (
+        # supabase
+        # .table("athletes")
+        # .select("*")
+        # .limit(1)
+        # .execute()
+        # .data[0]
+    # )
+
+    # token_data = refresh_access_token(
+        # athlete["refresh_token"]
+    # )
+
+    # expires_at = datetime.fromtimestamp(
+        # token_data["expires_at"]
+    # )
+    
+    # supabase.table("athletes").update(
+        # {
+            # "refresh_token": token_data["refresh_token"],
+            # "expires_at": expires_at.isoformat()
+        # }
+    # ).eq(
+        # "strava_athlete_id",
+        # athlete["strava_athlete_id"]
+    # ).execute()
+    
+    # return {
+        # "status": "ok",
+        # "strava_athlete_id": athlete["strava_athlete_id"],
+        # "expires_at": expires_at.isoformat()
+    # }
+    
 @app.get("/test-refresh")
 def test_refresh():
 
@@ -185,26 +222,4 @@ def test_refresh():
         .data[0]
     )
 
-    token_data = refresh_access_token(
-        athlete["refresh_token"]
-    )
-
-    expires_at = datetime.fromtimestamp(
-        token_data["expires_at"]
-    )
-    
-    supabase.table("athletes").update(
-        {
-            "refresh_token": token_data["refresh_token"],
-            "expires_at": expires_at.isoformat()
-        }
-    ).eq(
-        "strava_athlete_id",
-        athlete["strava_athlete_id"]
-    ).execute()
-    
-    return {
-        "status": "ok",
-        "strava_athlete_id": athlete["strava_athlete_id"],
-        "expires_at": expires_at.isoformat()
-    }
+    return refresh_athlete_token(athlete)

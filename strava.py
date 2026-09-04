@@ -1,6 +1,8 @@
 import os
 import requests
 
+from config import supabase
+from datetime import datetime
 from config import (
     STRAVA_CLIENT_ID,
 
@@ -22,3 +24,29 @@ def refresh_access_token(refresh_token: str):
     response.raise_for_status()
 
     return response.json()
+    
+def refresh_athlete_token(athlete):
+
+    token_data = refresh_access_token(
+        athlete["refresh_token"]
+    )
+
+    expires_at = datetime.fromtimestamp(
+        token_data["expires_at"]
+    )
+
+    supabase.table("athletes").update(
+        {
+            "refresh_token": token_data["refresh_token"],
+            "expires_at": expires_at.isoformat()
+        }
+    ).eq(
+        "strava_athlete_id",
+        athlete["strava_athlete_id"]
+    ).execute()
+
+    return {
+        "status": "ok",
+        "strava_athlete_id": athlete["strava_athlete_id"],
+        "expires_at": expires_at.isoformat()
+    }
