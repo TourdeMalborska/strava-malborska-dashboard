@@ -45,8 +45,17 @@ def refresh_athlete_token(athlete):
         athlete["strava_athlete_id"]
     ).execute()
 
-    return {
-        "status": "ok",
-        "strava_athlete_id": athlete["strava_athlete_id"],
-        "expires_at": expires_at.isoformat()
-    }
+    return token_data["access_token"]
+
+def get_activities(access_token):
+
+    response = requests.get(
+        "https://www.strava.com/api/v3/athlete/activities",
+        headers={
+            "Authorization": f"Bearer {access_token}"
+        }
+    )
+
+    response.raise_for_status()
+
+    return response.json()

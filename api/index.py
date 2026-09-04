@@ -6,6 +6,7 @@ from fastapi.responses import Response, RedirectResponse
 from pydantic import BaseModel
 from supabase import create_client
 from strava import refresh_access_token
+from strava import get_activities
 from dotenv import load_dotenv
 from datetime import datetime
 
@@ -223,3 +224,29 @@ def test_refresh():
     )
 
     return refresh_athlete_token(athlete)
+    
+@app.get("/test-activities")
+def test_activities():
+
+    athlete = (
+        supabase
+        .table("athletes")
+        .select("*")
+        .limit(1)
+        .execute()
+        .data[0]
+    )
+
+    access_token = refresh_athlete_token(
+        athlete
+    )
+
+    activities = get_activities(
+#        athlete["access_token"]
+         access_token 
+ )
+
+    return {
+        "count": len(activities)
+    }
+    
