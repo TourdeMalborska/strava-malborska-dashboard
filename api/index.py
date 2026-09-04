@@ -7,8 +7,18 @@ from pydantic import BaseModel
 from supabase import create_client
 from strava import refresh_access_token
 from dotenv import load_dotenv
+from datetime import datetime
 
-load_dotenv()
+from config import (
+    STRAVA_CLIENT_ID,
+    STRAVA_CLIENT_SECRET,
+    STRAVA_REDIRECT_URI,
+    supabase
+)
+
+from strava import refresh_access_token
+
+#load_dotenv()
 
 app = FastAPI()
 
@@ -18,20 +28,20 @@ app = FastAPI()
     # os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 # )
 
-supabase = create_client(
-    os.getenv("SUPABASE_URL"),
-    os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-)
+#supabase = create_client(
+#    os.getenv("SUPABASE_URL"),
+#    os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+#)
 
 #for local test put real Client_ID from Strava
 #STRAVA_CLIENT_ID = "xxx"
 
 #For Vercel Production
-STRAVA_CLIENT_ID = os.getenv("STRAVA_CLIENT_ID")
+#STRAVA_CLIENT_ID = os.getenv("STRAVA_CLIENT_ID")
 
-STRAVA_REDIRECT_URI = (
-    "http://localhost:8000/auth/strava/callback"
-)
+#STRAVA_REDIRECT_URI = (
+#    "http://localhost:8000/auth/strava/callback"
+#)
 
 # STRAVA_REDIRECT_URI = (
    # "https://strava-malborska-dashboard.vercel.app/auth/strava/callback"
@@ -105,7 +115,7 @@ def strava_callback(code: str):
     print("ATHLETE SAVED")
     return {
         "status": "saved",
-        "athlete_id": athlete["id"],
+        "strava_athlete_id": athlete["id"],
         "firstname": athlete["firstname"],
         "lastname": athlete["lastname"]
     }
@@ -179,4 +189,22 @@ def test_refresh():
         athlete["refresh_token"]
     )
 
-    return token_data
+    expires_at = datetime.fromtimestamp(
+        token_data["expires_at"]
+    )
+    
+    supabase.table("athletes").update(
+        {
+            "refresh_token": token_data["refresh_token"],
+            "expires_at": expires_at.isoformat()
+        }
+    ).eq(
+        "strava_athlete_id",
+        athlete["strava_athlete_id"]
+    ).execute()
+    
+    return {
+        "status": "ok",
+        "strava_athlete_id": athlete["strava_athlete_id"],
+        "expires_at": expires_at.isoformat()
+    }

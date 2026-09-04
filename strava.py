@@ -1,6 +1,11 @@
 import os
 import requests
 
+from config import (
+    STRAVA_CLIENT_ID,
+
+    STRAVA_CLIENT_SECRET
+)
 
 def refresh_access_token(refresh_token: str):
 
