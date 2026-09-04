@@ -59,3 +59,30 @@ def get_activities(access_token):
     response.raise_for_status()
 
     return response.json()
+    
+def save_activities(activities):
+
+    records = []
+
+    for activity in activities:
+
+        records.append(
+            {
+                "activity_id": activity["id"],
+                "strava_athlete_id": activity["athlete"]["id"],
+                "activity_date": activity["start_date"][:10],
+                "distance": activity["distance"],
+                "moving_time": activity["moving_time"],
+                "sport_type": activity["sport_type"],
+                "activity_name": activity["name"]
+            }
+        )
+
+    result = (
+        supabase
+        .table("activities")
+        .upsert(records)
+        .execute()
+    )
+
+    return result

@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from supabase import create_client
 from strava import refresh_access_token
 from strava import get_activities
+from strava import save_activities
 from dotenv import load_dotenv
 from datetime import datetime
 
@@ -245,8 +246,36 @@ def test_activities():
 #        athlete["access_token"]
          access_token 
  )
+    return activities[0]
+    # return {
+        # "count": len(activities)
+    # }
+    
+@app.get("/test-save-activities")
+def test_save_activities():
+
+    athlete = (
+        supabase
+        .table("athletes")
+        .select("*")
+        .limit(1)
+        .execute()
+        .data[0]
+    )
+
+    access_token = refresh_athlete_token(
+        athlete
+    )
+
+    activities = get_activities(
+        access_token
+    )
+
+    save_activities(
+        [activities[0]]
+    )
 
     return {
-        "count": len(activities)
+        "status": "saved",
+        "activity_id": activities[0]["id"]
     }
-    
