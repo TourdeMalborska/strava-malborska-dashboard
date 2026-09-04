@@ -5,11 +5,15 @@ from fastapi import FastAPI
 from fastapi.responses import Response, RedirectResponse
 from pydantic import BaseModel
 from supabase import create_client
-from strava import refresh_access_token
-from strava import get_activities
-from strava import save_activities
 from dotenv import load_dotenv
 from datetime import datetime
+
+from strava import (
+    refresh_athlete_token,
+    get_activities,
+    get_yesterday_activities,
+    save_activities
+)
 
 from config import (
     STRAVA_CLIENT_ID,
@@ -272,10 +276,34 @@ def test_save_activities():
     )
 
     save_activities(
-        [activities[0]]
+        activities
     )
 
     return {
         "status": "saved",
         "activity_id": activities[0]["id"]
+    }
+    
+@app.get("/test-yesterday")
+def test_yesterday():
+
+    athlete = (
+        supabase
+        .table("athletes")
+        .select("*")
+        .limit(1)
+        .execute()
+        .data[0]
+    )
+    
+    access_token = refresh_athlete_token(
+        athlete
+    )
+
+    activities = get_yesterday_activities(
+        access_token
+    )
+
+    return {
+        "count": len(activities)
     }

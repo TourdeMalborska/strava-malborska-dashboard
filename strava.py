@@ -3,6 +3,7 @@ import requests
 
 from config import supabase
 from datetime import datetime
+from datetime import datetime, timedelta, UTC
 from config import (
     STRAVA_CLIENT_ID,
 
@@ -86,3 +87,20 @@ def save_activities(activities):
     )
 
     return result
+    
+def get_yesterday_activities(access_token):
+
+    activities = get_activities(access_token)
+
+    yesterday = (
+        datetime.now(UTC).date()
+        - timedelta(days=1)
+    )
+
+    return [
+        activity
+        for activity in activities
+        if datetime.fromisoformat(
+            activity["start_date"].replace("Z", "+00:00")
+        ).date() == yesterday
+    ]
