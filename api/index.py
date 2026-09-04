@@ -6,8 +6,17 @@ from fastapi.responses import Response, RedirectResponse
 from pydantic import BaseModel
 from supabase import create_client
 from strava import refresh_access_token
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = FastAPI()
+
+# print("SUPABASE_URL =", os.getenv("SUPABASE_URL"))
+# print(
+    # "SUPABASE_SERVICE_ROLE_KEY =",
+    # os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+# )
 
 supabase = create_client(
     os.getenv("SUPABASE_URL"),
@@ -17,16 +26,16 @@ supabase = create_client(
 #for local test put real Client_ID from Strava
 #STRAVA_CLIENT_ID = "xxx"
 
-# STRAVA_REDIRECT_URI = (
-    # "http://localhost:8000/auth/strava/callback"
-# )
-
 #For Vercel Production
 STRAVA_CLIENT_ID = os.getenv("STRAVA_CLIENT_ID")
 
 STRAVA_REDIRECT_URI = (
-   "https://strava-malborska-dashboard.vercel.app/auth/strava/callback"
+    "http://localhost:8000/auth/strava/callback"
 )
+
+# STRAVA_REDIRECT_URI = (
+   # "https://strava-malborska-dashboard.vercel.app/auth/strava/callback"
+# )
 
 class StatusResponse(BaseModel):
 
@@ -77,6 +86,8 @@ def strava_callback(code: str):
     )
 
     token_data = response.json()
+#    print("TOKEN DATA:")
+#    print(token_data)
 
     athlete = token_data["athlete"]
 
@@ -91,7 +102,7 @@ def strava_callback(code: str):
         "consent_date": datetime.utcnow().isoformat(),
         "active": True
     }).execute()
-
+    print("ATHLETE SAVED")
     return {
         "status": "saved",
         "athlete_id": athlete["id"],
