@@ -83,7 +83,16 @@ from datetime import datetime
 
 
 @app.get("/auth/strava/callback")
-def strava_callback(code: str):
+def strava_callback(
+    code: str = None,
+    error: str = None
+):
+
+    if not code:
+        return RedirectResponse(
+           url="/auth-cancelled",
+           status_code=302
+        )
 
     response = requests.post(
         "https://www.strava.com/oauth/token",
@@ -286,6 +295,35 @@ def test_yesterday():
     )
 
     return {
+        "count": len(activities)
+    }
+
+#---------------------------
+#Temp endpoint for testing revoked tokens
+#---------------------------
+
+
+@app.get("/test-athlete/{index}")
+def test_athlete(index: int):
+
+    athlete = (
+        supabase
+        .table("athletes")
+        .select("*")
+        .execute()
+        .data[index]
+    )
+
+    access_token = refresh_athlete_token(
+        athlete
+    )
+
+    activities = get_activities(
+        access_token
+    )
+
+    return {
+        "athlete": athlete["firstname"],
         "count": len(activities)
     }
 
