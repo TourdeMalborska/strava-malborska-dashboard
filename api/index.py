@@ -323,9 +323,15 @@ def test_athlete(index: int):
     )
 
     return {
-        "athlete": athlete["firstname"],
-        "count": len(activities)
-    }
+    "athlete_id": athlete["strava_athlete_id"],
+    "firstname": athlete["firstname"],
+    "lastname": athlete["lastname"],
+    "activities_found": len(activities),
+    "first_activity_id": (
+        activities[0]["id"]
+        if activities else None
+    )
+}
 
 #--------------------------
 #HTML Call for welcome page
