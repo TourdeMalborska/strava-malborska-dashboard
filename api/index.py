@@ -338,3 +338,32 @@ def auth_success():
     </body>
     </html>
     """
+    
+@app.get("/auth-cancelled", response_class=HTMLResponse)
+def auth_cancelled():
+
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Tour de Malborska</title>
+    </head>
+    <body style="
+        font-family: Arial;
+        text-align: center;
+        padding-top: 100px;
+    ">
+
+        <h1>❌ Autoryzacja anulowana</h1>
+
+        <p>
+            Nie udzielono zgody na połączenie ze Strava.
+        </p>
+
+        <p>
+            Możesz zamknąć okno lub spróbować ponownie.
+        </p>
+
+    </body>
+    </html>
+    """
