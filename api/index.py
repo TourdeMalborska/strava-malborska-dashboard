@@ -303,35 +303,57 @@ def test_yesterday():
 #---------------------------
 
 
+# @app.get("/test-athlete/{index}")
+# def test_athlete(index: int):
+
+    # athlete = (
+        # supabase
+        # .table("athletes")
+        # .select("*")
+        # .execute()
+        # .data[index]
+    # )
+
+    # access_token = refresh_athlete_token(
+        # athlete
+    # )
+
+    # activities = get_activities(
+        # access_token
+    # )
+
+    # return {
+    # "athlete_id": athlete["strava_athlete_id"],
+    # "firstname": athlete["firstname"],
+    # "lastname": athlete["lastname"],
+    # "activities_found": len(activities),
+    # "first_activity_id": (
+        # activities[0]["id"]
+        # if activities else None
+    # )
+# }
+
+#Temp test athlete id
+
 @app.get("/test-athlete/{index}")
 def test_athlete(index: int):
 
-    athlete = (
+    athletes = (
         supabase
         .table("athletes")
         .select("*")
         .execute()
-        .data[index]
+        .data
     )
 
-    access_token = refresh_athlete_token(
-        athlete
-    )
-
-    activities = get_activities(
-        access_token
-    )
+    athlete = athletes[index]
 
     return {
-    "athlete_id": athlete["strava_athlete_id"],
-    "firstname": athlete["firstname"],
-    "lastname": athlete["lastname"],
-    "activities_found": len(activities),
-    "first_activity_id": (
-        activities[0]["id"]
-        if activities else None
-    )
-}
+        "index": index,
+        "athlete_id": athlete["strava_athlete_id"],
+        "firstname": athlete["firstname"],
+        "lastname": athlete["lastname"]
+    }
 
 #--------------------------
 #HTML Call for welcome page
