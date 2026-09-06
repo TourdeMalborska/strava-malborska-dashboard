@@ -3,6 +3,7 @@ import requests
 
 from fastapi import FastAPI
 from fastapi.responses import Response, RedirectResponse
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from supabase import create_client
 from dotenv import load_dotenv
@@ -119,22 +120,10 @@ def strava_callback(code: str):
         "lastname": athlete["lastname"]
     }
 
-# @app.get("/auth/strava/callback")
-# def strava_callback(code: str):
-
-    # response = requests.post(
-        # "https://www.strava.com/oauth/token",
-        # data={
-            # "client_id": os.getenv("STRAVA_CLIENT_ID"),
-            # "client_secret": os.getenv("STRAVA_CLIENT_SECRET"),
-            # # "client_id": "xxx",
-            # # "client_secret": "xxx",
-            # "code": code,
-            # "grant_type": "authorization_code"
-        # }
-    # )
-
-    # return response.json()
+#   return RedirectResponse(
+#       url="/auth-success",
+#       status_code=302
+#   )
 
 @app.get("/athletes")
 def get_athletes():
@@ -299,3 +288,53 @@ def test_yesterday():
     return {
         "count": len(activities)
     }
+
+#--------------------------
+#HTML Call for welcome page
+#Redirect call to Strava service
+#--------------------------
+
+
+@app.get("/auth-success", response_class=HTMLResponse)
+def auth_success():
+
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Tour de Malborska</title>
+
+        <script>
+            let countdown = 5;
+
+            setInterval(() => {
+                countdown--;
+
+                document.getElementById("counter").innerText = countdown;
+
+                if (countdown <= 0) {
+                    window.location.href = "https://www.strava.com";
+                }
+            }, 1000);
+        </script>
+
+    </head>
+    <body style="
+        font-family: Arial;
+        text-align: center;
+        padding-top: 100px;
+    ">
+
+        <h1>✅ Konto zostało połączone</h1>
+
+        <p>
+            Autoryzacja aplikacji Tour de Malborska zakończyła się sukcesem.
+        </p>
+
+        <p>
+            Za <span id="counter">5</span> sekund wrócisz do Stravy.
+        </p>
+
+    </body>
+    </html>
+    """
