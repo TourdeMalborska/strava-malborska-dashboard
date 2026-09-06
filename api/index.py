@@ -46,14 +46,6 @@ app = FastAPI()
 #For Vercel Production
 #STRAVA_CLIENT_ID = os.getenv("STRAVA_CLIENT_ID")
 
-#STRAVA_REDIRECT_URI = (
-#    "http://localhost:8000/auth/strava/callback"
-#)
-
-# STRAVA_REDIRECT_URI = (
-   # "https://strava-malborska-dashboard.vercel.app/auth/strava/callback"
-# )
-
 class StatusResponse(BaseModel):
 
 	status: str

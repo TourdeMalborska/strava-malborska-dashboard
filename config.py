@@ -10,8 +10,12 @@ load_dotenv()
 STRAVA_CLIENT_ID = os.getenv("STRAVA_CLIENT_ID")
 STRAVA_CLIENT_SECRET = os.getenv("STRAVA_CLIENT_SECRET")
 
+# STRAVA_REDIRECT_URI = (
+    # "http://localhost:8000/auth/strava/callback"
+# )
+
 STRAVA_REDIRECT_URI = (
-    "http://localhost:8000/auth/strava/callback"
+    "https://strava-malborska-dashboard.vercel.app/auth/strava/callback"
 )
 
 supabase = create_client(
