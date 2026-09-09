@@ -110,30 +110,26 @@ def strava_callback(
 
     athlete = token_data["athlete"]
 
-supabase.table("athletes").upsert({
-    "strava_athlete_id": athlete["id"],
-    "firstname": athlete["firstname"],
-    "lastname": athlete["lastname"],
-    "email": athlete.get("email"),
-    "profile_picture": athlete.get("profile"),
-    "timezone": athlete.get("timezone"),
-    "country": athlete.get("country"),
-    "city": athlete.get("city"),
-
-    "access_token": token_data["access_token"],
-    "refresh_token": token_data["refresh_token"],
-    "expires_at": datetime.utcfromtimestamp(
-        token_data["expires_at"]
-    ).isoformat(),
-
-    "consent_date": datetime.utcnow().isoformat(),
-    "active": True,
-    "status": "active",
-    "error_message": None,
-    "last_sync": None,
-    "updated_at": datetime.utcnow().isoformat(),
-    "revoked_at": None
-}).execute()
+    supabase.table("athletes").upsert({
+        "strava_athlete_id": athlete["id"],
+        "firstname": athlete["firstname"],
+        "lastname": athlete["lastname"],
+        "email": athlete.get("email"),
+        "profile_picture": athlete.get("profile"),
+        "timezone": athlete.get("timezone"),
+        "country": athlete.get("country"),
+        "city": athlete.get("city"),
+        "access_token": token_data["access_token"],
+        "refresh_token": token_data["refresh_token"],
+        "expires_at": datetime.utcfromtimestamp(token_data["expires_at"]).isoformat(),
+        "consent_date": datetime.utcnow().isoformat(),
+        "active": True,
+        "status": "active",
+        "error_message": None,
+        "last_sync": None,
+        "updated_at": datetime.utcnow().isoformat(),
+        "revoked_at": None
+    }).execute()
 
 #   return RedirectResponse(
 #       url="/auth-success",
