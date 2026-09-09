@@ -140,6 +140,43 @@ supabase.table("athletes").upsert({
 #       status_code=302
 #   )
 
+@app.post("/strava/webhook")
+async def strava_webhook(payload: dict):
+
+    print("WEBHOOK RECEIVED:", payload)
+
+    object_type = payload.get("object_type")
+    aspect_type = payload.get("aspect_type")
+    updates = payload.get("updates", {})
+    athlete_id = payload.get("object_id")
+
+    # 1. Obsługa revoke
+    if (
+        object_type == "athlete"
+        and aspect_type == "update"
+        and updates.get("authorized") == "false"
+    ):
+        print(f"REVOKE DETECTED for athlete {athlete_id}")
+
+        supabase.table("athletes").update({
+            "active": False,
+            "status": "revoked",
+            "refresh_token": None,
+            "access_token": None,
+            "expires_at": None,
+            "error_message": "revoked_by_user",
+            "revoked_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.utcnow().isoformat()
+        }).eq("strava_athlete_id", athlete_id).execute()
+
+        print("ATHLETE REVOKED")
+        return {"status": "revoked", "athlete_id": athlete_id}
+
+    # 2. Inne webhooki (np. nowe aktywności)
+    print("Webhook ignored (not revoke)")
+    return {"status": "ignored"}
+
+
 @app.get("/athletes")
 def get_athletes():
 
