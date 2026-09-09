@@ -399,6 +399,24 @@ def test_athlete(index: int):
 #Redirect call to Strava service
 #--------------------------
 
+@app.get("/api/strava/webhook")
+async def strava_webhook_verify(request: Request):
+    mode = request.query_params.get("hub.mode")
+    token = request.query_params.get("hub.verify_token")
+    challenge = request.query_params.get("hub.challenge")
+
+    if mode == "subscribe" and token == "malborska123":
+        return {"hub.challenge": challenge}
+
+    return {"status": "ignored"}
+
+
+@app.post("/api/strava/webhook")
+async def strava_webhook_event(request: Request):
+    body = await request.json()
+    print("EVENT RECEIVED:", body)
+    return {"status": "ok"}
+
 
 @app.get("/auth-success", response_class=HTMLResponse)
 def auth_success():
