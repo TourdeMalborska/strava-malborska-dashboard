@@ -11,6 +11,8 @@ from supabase import create_client
 from dotenv import load_dotenv
 from datetime import datetime
 
+app = FastAPI()
+
 from strava import (
     refresh_athlete_token,
     get_activities,
