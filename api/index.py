@@ -23,30 +23,6 @@ from config import (
     supabase
 )
 
-#from strava import refresh_access_token
-from strava import refresh_athlete_token
-
-#load_dotenv()
-
-app = FastAPI()
-
-# print("SUPABASE_URL =", os.getenv("SUPABASE_URL"))
-# print(
-    # "SUPABASE_SERVICE_ROLE_KEY =",
-    # os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-# )
-
-#supabase = create_client(
-#    os.getenv("SUPABASE_URL"),
-#    os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-#)
-
-#for local test put real Client_ID from Strava
-#STRAVA_CLIENT_ID = "xxx"
-
-#For Vercel Production
-#STRAVA_CLIENT_ID = os.getenv("STRAVA_CLIENT_ID")
-
 class StatusResponse(BaseModel):
 
 	status: str
@@ -135,43 +111,6 @@ def strava_callback(
 #       url="/auth-success",
 #       status_code=302
 #   )
-
-@app.post("/strava/webhook")
-async def strava_webhook(payload: dict):
-
-    print("WEBHOOK RECEIVED:", payload)
-
-    object_type = payload.get("object_type")
-    aspect_type = payload.get("aspect_type")
-    updates = payload.get("updates", {})
-    athlete_id = payload.get("object_id")
-
-    # 1. Obsługa revoke
-    if (
-        object_type == "athlete"
-        and aspect_type == "update"
-        and updates.get("authorized") == "false"
-    ):
-        print(f"REVOKE DETECTED for athlete {athlete_id}")
-
-        supabase.table("athletes").update({
-            "active": False,
-            "status": "revoked",
-            "refresh_token": None,
-            "access_token": None,
-            "expires_at": None,
-            "error_message": "revoked_by_user",
-            "revoked_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat()
-        }).eq("strava_athlete_id", athlete_id).execute()
-
-        print("ATHLETE REVOKED")
-        return {"status": "revoked", "athlete_id": athlete_id}
-
-    # 2. Inne webhooki (np. nowe aktywności)
-    print("Webhook ignored (not revoke)")
-    return {"status": "ignored"}
-
 
 @app.get("/athletes")
 def get_athletes():
@@ -399,6 +338,10 @@ def test_athlete(index: int):
 #Redirect call to Strava service
 #--------------------------
 
+from fastapi import Request, HTTPException
+from fastapi.responses import JSONResponse
+
+# GET — Strava challenge verification
 @app.get("/api/strava/webhook")
 async def strava_webhook_verify(request: Request):
     mode = request.query_params.get("hub.mode")
@@ -406,15 +349,21 @@ async def strava_webhook_verify(request: Request):
     challenge = request.query_params.get("hub.challenge")
 
     if mode == "subscribe" and token == "malborska123":
-        return {"hub.challenge": challenge}
+        return JSONResponse(content={"hub.challenge": challenge}, status_code=200)
 
-    return {"status": "ignored"}
+    return JSONResponse(content={"status": "ignored"}, status_code=200)
 
-
+# POST — Strava events
 @app.post("/api/strava/webhook")
 async def strava_webhook_event(request: Request):
-    body = await request.json()
-    print("EVENT RECEIVED:", body)
+    try:
+        payload = await request.json()
+    except Exception as e:
+        print("Invalid JSON in webhook POST:", e)
+        raise HTTPException(status_code=400, detail="Invalid JSON")
+
+    print("WEBHOOK EVENT RECEIVED:", payload)
+    # obsługa revoke itd. — twoja logika tutaj
     return {"status": "ok"}
 
 
