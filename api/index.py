@@ -369,11 +369,88 @@ async def strava_webhook_event(request: Request):
 
     print("WEBHOOK EVENT RECEIVED:", payload)
 
-    supabase.table("webhook_events").insert({
-        "payload": payload
-    }).execute()
+    object_type = payload.get("object_type")
+    aspect_type = payload.get("aspect_type")
+    object_id = payload.get("object_id")
+    owner_id = payload.get("owner_id")
+    updates = payload.get("updates") or {}
 
-    return {"status": "ok"}
+    # Najpierw zapisujemy surowy event do audytu/debugowania
+    try:
+        supabase.table("webhook_events").insert({
+            "payload": payload
+        }).execute()
+    except Exception as e:
+        # Nie powodujemy retry webhooka tylko dlatego,
+        # że zapis pomocniczego logu się nie udał
+        print("WEBHOOK EVENT LOG ERROR:", e)
+
+    # Strava revoke/deauthorization event:
+    # object_type = athlete
+    # aspect_type = update
+    # updates.authorized = "false"
+    is_revoke_event = (
+        object_type == "athlete"
+        and aspect_type == "update"
+        and str(updates.get("authorized")).lower() == "false"
+    )
+
+    if is_revoke_event:
+        athlete_id = object_id or owner_id
+        revoked_at = datetime.now(timezone.utc).isoformat()
+
+        try:
+            result = (
+                supabase
+                .table("athletes")
+                .update({
+                    "active": False,
+                    "status": "revoked",
+                    "revoked_at": revoked_at,
+                    "access_token": None,
+                    "refresh_token": None,
+                    "updated_at": revoked_at,
+                    "error_message": None
+                })
+                .eq("strava_athlete_id", athlete_id)
+                .execute()
+            )
+
+            print(
+                f"ATHLETE REVOKED: athlete_id={athlete_id}, "
+                f"updated_rows={len(result.data or [])}"
+            )
+
+        except Exception as e:
+            print(
+                f"REVOKE PROCESSING ERROR: "
+                f"athlete_id={athlete_id}, error={e}"
+            )
+
+            # Na obecnym etapie MVP zwracamy 200,
+            # aby Strava nie zapętlała ponowień.
+            # Event pozostaje zapisany w webhook_events.
+            return {
+                "status": "accepted",
+                "event": "athlete_revoke",
+                "athlete_id": athlete_id,
+                "processed": False
+            }
+
+        return {
+            "status": "ok",
+            "event": "athlete_revoke",
+            "athlete_id": athlete_id,
+            "processed": True
+        }
+
+    # Na razie pozostałe eventy tylko logujemy.
+    # Nightly sync pozostaje głównym mechanizmem pobierania aktywności.
+    return {
+        "status": "ok",
+        "event": f"{object_type}.{aspect_type}",
+        "processed": False
+    }
 
 @app.get("/auth-success", response_class=HTMLResponse)
 def auth_success():
