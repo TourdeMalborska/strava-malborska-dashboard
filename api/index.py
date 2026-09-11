@@ -367,9 +367,12 @@ async def strava_webhook_event(request: Request):
         raise HTTPException(status_code=400, detail="Invalid JSON")
 
     print("WEBHOOK EVENT RECEIVED:", payload)
-    # obsługa revoke itd. — twoja logika tutaj
-    return {"status": "ok"}
 
+    supabase.table("webhook_events").insert({
+        "payload": payload
+    }).execute()
+
+    return {"status": "ok"}
 
 @app.get("/auth-success", response_class=HTMLResponse)
 def auth_success():
