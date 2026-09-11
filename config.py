@@ -9,6 +9,7 @@ load_dotenv()
 
 STRAVA_CLIENT_ID = os.getenv("STRAVA_CLIENT_ID")
 STRAVA_CLIENT_SECRET = os.getenv("STRAVA_CLIENT_SECRET")
+STRAVA_VERIFY_TOKEN = os.getenv("STRAVA_VERIFY_TOKEN")
 
 # STRAVA_REDIRECT_URI = (
     # "http://localhost:8000/auth/strava/callback"

@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from supabase import create_client
 from dotenv import load_dotenv
-from datetime import datetime
+from datetime import datetime, timezone
 
 app = FastAPI()
 
@@ -23,6 +23,7 @@ from strava import (
 from config import (
     STRAVA_CLIENT_ID,
     STRAVA_CLIENT_SECRET,
+    STRAVA_VERIFY_TOKEN,
     STRAVA_REDIRECT_URI,
     supabase
 )
@@ -352,7 +353,7 @@ async def strava_webhook_verify(request: Request):
     token = request.query_params.get("hub.verify_token")
     challenge = request.query_params.get("hub.challenge")
 
-    if mode == "subscribe" and token == "malborska123":
+    if mode == "subscribe" and token == STRAVA_VERIFY_TOKEN:
         return JSONResponse(content={"hub.challenge": challenge}, status_code=200)
 
     return JSONResponse(content={"status": "ignored"}, status_code=200)
