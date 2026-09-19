@@ -1,16 +1,28 @@
 {
-  "routes": [
+  "crons": [
     {
-      "src": "/sync/daily",
-      "dest": "/sync/daily"
+      "path": "/sync/daily",
+      "schedule": "1 0 * * *"
     },
     {
-      "src": "/sync/rolling",
-      "dest": "/sync/rolling"
+      "path": "/sync/rolling",
+      "schedule": "0 4 * * *"
     },
     {
-      "src": "/(.*)",
-      "dest": "api/index.py"
+      "path": "/sync/rolling",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/sync/rolling",
+      "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/sync/rolling",
+      "schedule": "0 16 * * *"
+    },
+    {
+      "path": "/sync/rolling",
+      "schedule": "0 20 * * *"
     }
   ]
 }
