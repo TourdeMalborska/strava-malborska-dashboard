@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from supabase import create_client
 from dotenv import load_dotenv
 from datetime import datetime, timezone
+from sync import run_daily_sync, run_rolling_sync
 
 app = FastAPI()
 
@@ -337,6 +338,16 @@ def test_athlete(index: int):
         "firstname": athlete["firstname"],
         "lastname": athlete["lastname"]
     }
+
+@app.get("/sync/daily")
+def sync_daily():
+    results = run_daily_sync()
+    return {"mode": "daily", "results": results}
+
+@app.get("/sync/rolling")
+def sync_rolling():
+    results = run_rolling_sync()
+    return {"mode": "rolling", "results": results}
 
 #--------------------------
 #HTML Call for welcome page

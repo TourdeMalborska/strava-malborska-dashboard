@@ -1,81 +1,124 @@
-# strava.py
 import os
-import time
 import requests
-from typing import List, Dict, Any
-from datetime import datetime, timezone, timedelta
 
 from config import supabase
+from datetime import datetime
+from datetime import datetime, timedelta, UTC
+from config import (
+    STRAVA_CLIENT_ID,
 
-# -------------------------
-# Helpers
-# -------------------------
-def _to_iso_utc(ts: int) -> str:
-    return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+    STRAVA_CLIENT_SECRET
+)
 
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+def refresh_access_token(refresh_token: str):
 
-# -------------------------
-# Token refresh
-# -------------------------
-def refresh_access_token(refresh_token: str) -> Dict[str, Any]:
-    resp = requests.post(
+    response = requests.post(
         "https://www.strava.com/oauth/token",
         data={
             "client_id": os.getenv("STRAVA_CLIENT_ID"),
             "client_secret": os.getenv("STRAVA_CLIENT_SECRET"),
             "grant_type": "refresh_token",
             "refresh_token": refresh_token
-        },
-        timeout=30
+        }
     )
-    resp.raise_for_status()
-    return resp.json()
 
-def refresh_athlete_token(athlete: Dict[str, Any]) -> str:
-    """
-    Odświeża token i zapisuje access_token, refresh_token, expires_at, updated_at.
-    Zwraca access_token.
-    """
-    token_data = refresh_access_token(athlete["refresh_token"])
-    expires_at_iso = _to_iso_utc(token_data["expires_at"])
+    response.raise_for_status()
 
-    try:
-        supabase.table("athletes").update({
-            "refresh_token": token_data.get("refresh_token"),
-            "access_token": token_data.get("access_token"),
-            "expires_at": expires_at_iso,
-            "updated_at": _now_iso(),
-            "error_message": None
-        }).eq("strava_athlete_id", athlete["strava_athlete_id"]).execute()
-    except Exception as e:
-        # Nie przerywamy, ale logujemy — caller powinien obsłużyć wyjątek jeśli potrzebne
-        print(f"[strava] supabase update error in refresh_athlete_token: {e}")
+    return response.json()
+    
+def refresh_athlete_token(athlete):
+
+    token_data = refresh_access_token(
+        athlete["refresh_token"]
+    )
+
+    expires_at = datetime.fromtimestamp(
+        token_data["expires_at"]
+    )
+
+    supabase.table("athletes").update(
+        {
+            "refresh_token": token_data["refresh_token"],
+            "expires_at": expires_at.isoformat()
+        }
+    ).eq(
+        "strava_athlete_id",
+        athlete["strava_athlete_id"]
+    ).execute()
 
     return token_data["access_token"]
 
-# -------------------------
-# Simple non-range fetch (backwards compatibility)
-# -------------------------
-def get_activities(access_token: str) -> List[Dict[str, Any]]:
-    resp = requests.get(
-        "https://www.strava.com/api/v3/athlete/activities",
-        headers={"Authorization": f"Bearer {access_token}"},
-        timeout=30
-    )
-    resp.raise_for_status()
-    return resp.json()
+def get_activities(access_token):
 
-# -------------------------
-# Range fetch with pagination and retry
-# -------------------------
-def get_activities_range(access_token: str, start_ts: datetime, end_ts: datetime) -> List[Dict[str, Any]]:
+    response = requests.get(
+        "https://www.strava.com/api/v3/athlete/activities",
+        headers={
+            "Authorization": f"Bearer {access_token}"
+        }
+    )
+
+    response.raise_for_status()
+
+    return response.json()
+    
+def save_activities(activities):
+
+    records = []
+
+    for activity in activities:
+
+        records.append(
+            {
+                "activity_id": activity["id"],
+                "strava_athlete_id": activity["athlete"]["id"],
+                "activity_date": activity["start_date"][:10],
+                "distance": activity["distance"],
+                "moving_time": activity["moving_time"],
+                "sport_type": activity["sport_type"],
+                "activity_name": activity["name"]
+            }
+        )
+
+    result = (
+        supabase
+        .table("activities")
+        .upsert(records)
+        .execute()
+    )
+
+    return result
+    
+def get_yesterday_activities(access_token):
+
+    activities = get_activities(access_token)
+
+    yesterday = (
+        datetime.now(UTC).date()
+        - timedelta(days=1)
+    )
+
+    return [
+        activity
+        for activity in activities
+        if datetime.fromisoformat(
+            activity["start_date"].replace("Z", "+00:00")
+        ).date() == yesterday
+    ]
+
+import time
+from datetime import datetime, timezone, timedelta
+import requests
+from config import supabase
+
+def _to_iso_utc(ts: int) -> str:
+    return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+
+def get_activities_range(access_token: str, start_ts: datetime, end_ts: datetime):
     url = "https://www.strava.com/api/v3/athlete/activities"
     headers = {"Authorization": f"Bearer {access_token}"}
     per_page = 200
     page = 1
-    results: List[Dict[str, Any]] = []
+    results = []
 
     while True:
         params = {
@@ -101,7 +144,7 @@ def get_activities_range(access_token: str, start_ts: datetime, end_ts: datetime
                 print(f"[strava] request error (attempt {attempt}) {e}, backoff {backoff}s")
                 time.sleep(backoff)
         if resp is None:
-            raise RuntimeError("Failed to fetch activities from Strava after retries")
+            raise RuntimeError("Failed to fetch activities from Strava")
 
         data = resp.json()
         if not data:
@@ -113,10 +156,7 @@ def get_activities_range(access_token: str, start_ts: datetime, end_ts: datetime
 
     return results
 
-# -------------------------
-# Save activities (upsert by activity_id)
-# -------------------------
-def save_activities(activities: List[Dict[str, Any]]) -> Dict[str, Any]:
+def save_activities(activities):
     if not activities:
         return {"status": "no_activities", "inserted": 0}
 
@@ -124,7 +164,7 @@ def save_activities(activities: List[Dict[str, Any]]) -> Dict[str, Any]:
     for activity in activities:
         records.append({
             "activity_id": activity["id"],
-            "strava_athlete_id": activity.get("athlete", {}).get("id"),
+            "strava_athlete_id": activity["athlete"]["id"],
             "activity_date": activity.get("start_date", "")[:10],
             "distance": activity.get("distance"),
             "moving_time": activity.get("moving_time"),
@@ -133,14 +173,11 @@ def save_activities(activities: List[Dict[str, Any]]) -> Dict[str, Any]:
             "raw": activity
         })
 
-    # Supabase upsert requires unique constraint on activity_id
+    # Supabase upsert requires unique constraint on activity_id in DB
     result = supabase.table("activities").upsert(records).execute()
     return {"status": "ok", "data": result.data}
 
-# -------------------------
-# Yesterday helper using range fetch
-# -------------------------
-def get_yesterday_activities(access_token: str) -> List[Dict[str, Any]]:
+def get_yesterday_activities(access_token):
     today_utc = datetime.now(timezone.utc).date()
     yesterday = today_utc - timedelta(days=1)
     start_ts = datetime.combine(yesterday, datetime.min.time()).replace(tzinfo=timezone.utc)

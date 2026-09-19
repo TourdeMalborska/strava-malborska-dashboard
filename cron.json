@@ -1,0 +1,8 @@
+[
+  { "path": "/sync/daily", "schedule": "1 0 * * *" },
+  { "path": "/sync/rolling", "schedule": "0 4 * * *" },
+  { "path": "/sync/rolling", "schedule": "0 8 * * *" },
+  { "path": "/sync/rolling", "schedule": "0 12 * * *" },
+  { "path": "/sync/rolling", "schedule": "0 16 * * *" },
+  { "path": "/sync/rolling", "schedule": "0 20 * * *" }
+]
