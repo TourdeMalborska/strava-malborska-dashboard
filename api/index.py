@@ -113,10 +113,10 @@ def strava_callback(
         "revoked_at": None
     }).execute()
 
-#   return RedirectResponse(
-#       url="/auth-success",
-#       status_code=302
-#   )
+    return RedirectResponse(
+        url="/auth-success",
+        status_code=302
+    )
 
 @app.get("/athletes")
 def get_athletes():
@@ -481,7 +481,7 @@ def auth_success():
                 document.getElementById("counter").innerText = countdown;
 
                 if (countdown <= 0) {
-                    window.location.href = "https://www.strava.com";
+                    window.location.href = "https://www.strava.com/dashboard";
                 }
             }, 1000);
         </script>

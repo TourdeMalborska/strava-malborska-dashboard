@@ -1,28 +1,23 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
     {
       "path": "/sync/daily",
       "schedule": "1 0 * * *"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/sync/daily",
+      "dest": "/sync/daily"
     },
     {
-      "path": "/sync/rolling",
-      "schedule": "0 4 * * *"
+      "src": "/sync/rolling",
+      "dest": "/sync/rolling"
     },
     {
-      "path": "/sync/rolling",
-      "schedule": "0 8 * * *"
-    },
-    {
-      "path": "/sync/rolling",
-      "schedule": "0 12 * * *"
-    },
-    {
-      "path": "/sync/rolling",
-      "schedule": "0 16 * * *"
-    },
-    {
-      "path": "/sync/rolling",
-      "schedule": "0 20 * * *"
+      "src": "/(.*)",
+      "dest": "api/index.py"
     }
   ]
 }
