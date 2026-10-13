@@ -100,6 +100,7 @@ def strava_callback(
         "profile_picture": athlete.get("profile"),
         "timezone": athlete.get("timezone"),
         "country": athlete.get("country"),
+	"sex": athlete.get("sex"),
         "city": athlete.get("city"),
         "access_token": token_data["access_token"],
         "refresh_token": token_data["refresh_token"],

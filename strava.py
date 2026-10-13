@@ -130,6 +130,7 @@ def save_activities(activities: List[Dict[str, Any]]) -> Dict[str, Any]:
             "moving_time": activity.get("moving_time"),
             "sport_type": activity.get("sport_type"),
             "activity_name": activity.get("name"),
+            "manual": activity.get("manual"),
             "raw": activity
         })
 
