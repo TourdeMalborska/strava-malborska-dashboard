@@ -1,0 +1,43 @@
+
+name: Test Supabase Backup Connection
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-connection:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Test database connection and RLS
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
+        run: |
+          set -euo pipefail
+
+          if [ -z "$DATABASE_URL" ]; then
+            echo "Missing SUPABASE_DB_URL secret"
+            exit 1
+          fi
+
+          psql "$DATABASE_URL" \
+            -X -v ON_ERROR_STOP=1 \
+            -c "SELECT current_user, current_database();"
+
+          psql "$DATABASE_URL" \
+            -X -v ON_ERROR_STOP=1 \
+            -c "SELECT COUNT(*) AS athletes_count FROM public.athletes;"
+
+          psql "$DATABASE_URL" \
+            -X -v ON_ERROR_STOP=1 \
+            -c "SELECT COUNT(*) AS activities_count FROM public.activities;"
