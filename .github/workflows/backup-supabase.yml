@@ -20,7 +20,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      
       - name: Install PostgreSQL 17 and AWS CLI
         run: |
           set -euo pipefail
@@ -62,6 +61,7 @@ jobs:
           aws --version
 
       - name: Run Supabase backup
+        id: supabase_backup
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -73,3 +73,47 @@ jobs:
         run: |
           export PATH="/usr/lib/postgresql/17/bin:$PATH"
           bash scripts/backup_supabase.sh
+
+      - name: Report backup result to New Relic
+        if: ${{ always() }}
+        continue-on-error: true
+        env:
+          NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
+          BACKUP_RESULT: ${{ job.status }}
+          BACKUP_STEP_RESULT: ${{ steps.supabase_backup.outcome }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.request
+
+          key = os.environ["NEW_RELIC_LICENSE_KEY"]
+
+          event = {
+              "eventType": "MalborskaBackup",
+              "status": os.environ["BACKUP_RESULT"],
+              "backupStepStatus": os.environ["BACKUP_STEP_RESULT"],
+              "workflow": "backup-supabase",
+              "runId": os.environ["GITHUB_RUN_ID"],
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "commitSha": os.environ["GITHUB_SHA"],
+          }
+
+          request = urllib.request.Request(
+              "https://insights-collector.eu01.nr-data.net/v1/accounts/8654524/events",
+              data=json.dumps([event]).encode("utf-8"),
+              headers={
+                  "Api-Key": key,
+                  "Content-Type": "application/json",
+              },
+              method="POST",
+          )
+
+          with urllib.request.urlopen(request, timeout=15) as response:
+              print(f"New Relic event HTTP status: {response.status}")
+
+          print(f"Reported backup status: {event['status']}")
+          PY
