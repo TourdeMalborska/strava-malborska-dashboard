@@ -1,5 +1,6 @@
 import os
 import requests
+import hmac
 
 from fastapi import FastAPI
 from fastapi import Request, HTTPException
@@ -340,10 +341,98 @@ def test_athlete(index: int):
         "lastname": athlete["lastname"]
     }
 
+
+def trigger_github_backup():
+    token = os.getenv("GITHUB_BACKUP_TOKEN")
+
+    if not token:
+        raise RuntimeError("GITHUB_BACKUP_TOKEN is not configured")
+
+    url = (
+        "https://api.github.com/repos/"
+        "TourdeMalborska/strava-malborska-dashboard/"
+        "actions/workflows/backup-supabase.yml/dispatches"
+    )
+
+    response = requests.post(
+        url,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+        json={"ref": "main"},
+        timeout=15,
+    )
+
+    if response.status_code != 204:
+        raise RuntimeError(
+            f"GitHub backup dispatch failed: HTTP {response.status_code}"
+        )
+
+
 @app.get("/sync/daily")
-def sync_daily():
+def sync_daily(request: Request):
+    cron_secret = os.getenv("CRON_SECRET")
+
+    if not cron_secret:
+        raise HTTPException(
+            status_code=503,
+            detail="Cron authentication is not configured",
+        )
+
+    authorization = request.headers.get("authorization", "")
+    expected = f"Bearer {cron_secret}"
+
+    if not hmac.compare_digest(authorization, expected):
+        raise HTTPException(
+            status_code=401,
+            detail="Unauthorized",
+        )
+
     results = run_daily_sync()
-    return {"mode": "daily", "results": results}
+
+    if not results:
+        raise HTTPException(
+            status_code=503,
+            detail="No active athletes to synchronize",
+        )
+
+    errors = [
+        result for result in results
+        if result.get("error") is not None
+    ]
+
+    if errors:
+        print(
+            f"[sync] Daily sync failed for {len(errors)} "
+            f"of {len(results)} athletes"
+        )
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "status": "sync_failed",
+                "athletes_total": len(results),
+                "athletes_failed": len(errors),
+            },
+        )
+
+    try:
+        trigger_github_backup()
+    except Exception as exc:
+        print(f"[backup] Dispatch error: {type(exc).__name__}")
+        raise HTTPException(
+            status_code=502,
+            detail="Synchronization succeeded, but backup dispatch failed",
+        )
+
+    return {
+        "mode": "daily",
+        "status": "sync_success",
+        "athletes_synced": len(results),
+        "backup": "requested",
+        "results": results,
+    }
 
 @app.get("/sync/rolling")
 def sync_rolling():
