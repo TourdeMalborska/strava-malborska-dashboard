@@ -1,0 +1,44 @@
+﻿name: Test New Relic Connection
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Send test event to New Relic
+        env:
+          NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.request
+
+          event = {
+              "eventType": "MalborskaBackupTest",
+              "status": "success",
+              "source": "github-actions-test",
+              "runId": os.environ["GITHUB_RUN_ID"]
+          }
+
+          request = urllib.request.Request(
+              "https://insights-collector.eu01.nr-data.net/v1/accounts/8654524/events",
+              data=json.dumps([event]).encode("utf-8"),
+              headers={
+                  "Api-Key": os.environ["NEW_RELIC_LICENSE_KEY"],
+                  "Content-Type": "application/json"
+              },
+              method="POST"
+          )
+
+          with urllib.request.urlopen(request, timeout=15) as response:
+              print("New Relic HTTP status:", response.status)
+
+          print("Test event sent")
+          PY
