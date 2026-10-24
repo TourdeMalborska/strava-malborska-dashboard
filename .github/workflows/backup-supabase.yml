@@ -20,11 +20,35 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install PostgreSQL and AWS CLI
+      - name: Install PostgreSQL 17 and AWS CLI
         run: |
+          set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y \
-            postgresql-client awscli
+            ca-certificates curl awscli
+
+          sudo install -d \
+            /usr/share/postgresql-common/pgdg
+
+          sudo curl --fail --location \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+
+          echo "Types: deb" | sudo tee \
+            /etc/apt/sources.list.d/pgdg.sources
+          echo "URIs: https://apt.postgresql.org/pub/repos/apt" | sudo tee -a \
+            /etc/apt/sources.list.d/pgdg.sources
+          echo "Suites: noble-pgdg" | sudo tee -a \
+            /etc/apt/sources.list.d/pgdg.sources
+          echo "Components: main" | sudo tee -a \
+            /etc/apt/sources.list.d/pgdg.sources
+          echo "Signed-By: /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc" | sudo tee -a \
+            /etc/apt/sources.list.d/pgdg.sources
+
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+
+          /usr/lib/postgresql/17/bin/pg_dump --version
 
       - name: Run Supabase backup
         env:
@@ -35,4 +59,6 @@ jobs:
           AWS_DEFAULT_REGION: ${{ vars.AWS_REGION }}
           S3_BUCKET: ${{ vars.S3_BUCKET }}
           S3_BACKUP_PREFIX: ${{ vars.S3_BACKUP_PREFIX }}
-        run: bash scripts/backup_supabase.sh
+        run: |
+          export PATH="/usr/lib/postgresql/17/bin:$PATH"
+          bash scripts/backup_supabase.sh
