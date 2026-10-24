@@ -30,26 +30,28 @@ jobs:
             exit 1
           fi
 
-          psql "$DATABASE_URL" \
-            -X -v ON_ERROR_STOP=1 \
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 \
             -c "SELECT current_user, current_database();"
 
-          psql "$DATABASE_URL" \
-            -X -v ON_ERROR_STOP=1 \
-            -c "SELECT COUNT(*) AS athletes_count FROM public.athletes;"
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 \
+            -c "SELECT 'activities' AS table_name, COUNT(*) AS row_count FROM public.activities UNION ALL SELECT 'athletes', COUNT(*) FROM public.athletes UNION ALL SELECT 'families', COUNT(*) FROM public.families UNION ALL SELECT 'webhook_events', COUNT(*) FROM public.webhook_events ORDER BY table_name;"
 
-          psql "$DATABASE_URL" \
-            -X -v ON_ERROR_STOP=1 \
-            -c "SELECT COUNT(*) AS activities_count FROM public.activities;"
+      - name: Verify expected row counts
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
+        run: |
+          set -euo pipefail
 
-psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -c "
-SELECT 'activities' AS table_name, COUNT(*) AS row_count
-FROM public.activities
-UNION ALL
-SELECT 'athletes', COUNT(*) FROM public.athletes
-UNION ALL
-SELECT 'families', COUNT(*) FROM public.families
-UNION ALL
-SELECT 'webhook_events', COUNT(*) FROM public.webhook_events
-ORDER BY table_name;
-"
+          COUNTS=$(psql "$DATABASE_URL" -X -At \
+            -v ON_ERROR_STOP=1 \
+            -c "SELECT (SELECT COUNT(*) FROM public.activities), (SELECT COUNT(*) FROM public.athletes), (SELECT COUNT(*) FROM public.families), (SELECT COUNT(*) FROM public.webhook_events);")
+
+          echo "Actual counts: $COUNTS"
+
+          if [ "$COUNTS" != "69|10|0|287" ]; then
+            echo "ERROR: Row counts differ from reference values"
+            exit 1
+          fi
+
+          echo "All four tables match reference counts."
