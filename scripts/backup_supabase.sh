@@ -20,63 +20,74 @@ DIR="$WORKDIR/$NAME"
 mkdir -p "$DIR"
 
 echo "Checking database identity..."
+
 DB_USER="$(psql "$SUPABASE_DB_URL" -X -At \
-  -v ON_ERROR_STOP=1 -c 'SELECT current_user')"
+  -v ON_ERROR_STOP=1 \
+  -c 'SELECT current_user')"
 
 if [ "$DB_USER" != "malborska_backup" ]; then
-  echo "Unexpected database user: $DB_USER"
+  echo "ERROR: Unexpected database user: $DB_USER"
   exit 1
 fi
 
-echo "Checking public tables and RLS..."
-psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 \
+echo "Checking required tables..."
+
+psql "$SUPABASE_DB_URL" -X \
+  -v ON_ERROR_STOP=1 -At \
   -c "
-SELECT c.relname AS table_name,
-       c.relrowsecurity AS rls_enabled,
-       has_table_privilege(
-         current_user, c.oid, 'SELECT'
-       ) AS can_select
-FROM pg_class c
-JOIN pg_namespace n ON n.oid = c.relnamespace
-WHERE n.nspname = 'public'
-  AND c.relkind IN ('r','p')
-ORDER BY c.relname;
-"
+SELECT CASE WHEN
+  (SELECT count(*) FROM pg_tables
+   WHERE schemaname = 'public'
+     AND tablename IN
+       ('activities','athletes','families','webhook_events')) = 4
+THEN 'OK' ELSE 'ERROR' END;
+" | grep -qx "OK"
 
-echo "Exporting schema..."
-pg_dump "$SUPABASE_DB_URL" \
-  --schema=public \
-  --schema-only \
-  --no-owner \
-  --no-acl \
-  --file="$DIR/schema.sql"
+echo "Exporting PostgreSQL database..."
 
-echo "Exporting data with RLS..."
 pg_dump "$SUPABASE_DB_URL" \
+  --format=custom \
   --schema=public \
-  --data-only \
   --enable-row-security \
-  --inserts \
   --no-owner \
   --no-acl \
-  --file="$DIR/data.sql"
+  --file="$DIR/database.dump"
+
+echo "Checking dump structure..."
+
+pg_restore --list "$DIR/database.dump" \
+  > "$DIR/dump_contents.txt"
+
+for TABLE in activities athletes families webhook_events; do
+  if ! grep -Eq "TABLE DATA public ${TABLE} " \
+    "$DIR/dump_contents.txt"; then
+    echo "ERROR: Missing table data: $TABLE"
+    exit 1
+  fi
+done
+
+if ! grep -Eq \
+  "SEQUENCE SET public webhook_events_id_seq " \
+  "$DIR/dump_contents.txt"; then
+  echo "ERROR: Missing sequence state"
+  exit 1
+fi
 
 echo "Exporting role metadata..."
+
 psql "$SUPABASE_DB_URL" -X \
-  -v ON_ERROR_STOP=1 \
-  --csv \
+  -v ON_ERROR_STOP=1 --csv \
   -c "
 SELECT rolname, rolcanlogin, rolinherit,
-       rolcreatedb, rolcreaterole,
-       rolbypassrls
+       rolcreatedb, rolcreaterole, rolbypassrls
 FROM pg_roles
 ORDER BY rolname;
 " > "$DIR/roles.csv"
 
 echo "Exporting grant metadata..."
+
 psql "$SUPABASE_DB_URL" -X \
-  -v ON_ERROR_STOP=1 \
-  --csv \
+  -v ON_ERROR_STOP=1 --csv \
   -c "
 SELECT grantee, table_schema, table_name,
        privilege_type
@@ -86,29 +97,28 @@ ORDER BY table_name, grantee, privilege_type;
 " > "$DIR/grants.csv"
 
 echo "Creating archive..."
+
 tar -czf "$WORKDIR/$NAME.tar.gz" \
   -C "$WORKDIR" "$NAME"
 
-sha256sum "$WORKDIR/$NAME.tar.gz" \
-  > "$WORKDIR/$NAME.tar.gz.sha256"
+cd "$WORKDIR"
+sha256sum "$NAME.tar.gz" > "$NAME.tar.gz.sha256"
 
 PREFIX="${S3_BACKUP_PREFIX#/}"
 PREFIX="${PREFIX%/}"
 
-echo "Uploading archive..."
-aws s3 cp "$WORKDIR/$NAME.tar.gz" \
+echo "Uploading archive to S3..."
+
+aws s3 cp "$NAME.tar.gz" \
   "s3://$S3_BUCKET/$PREFIX/$NAME.tar.gz" \
   --region "$AWS_REGION" \
   --no-progress
 
 echo "Uploading checksum..."
-aws s3 cp "$WORKDIR/$NAME.tar.gz.sha256" \
+
+aws s3 cp "$NAME.tar.gz.sha256" \
   "s3://$S3_BUCKET/$PREFIX/$NAME.tar.gz.sha256" \
   --region "$AWS_REGION" \
   --no-progress
-
-echo "Checking S3 objects..."
-aws s3 ls "s3://$S3_BUCKET/$PREFIX/" \
-  --region "$AWS_REGION" | grep -F "$NAME.tar.gz"
 
 echo "BACKUP UPLOAD COMPLETED: $NAME"
