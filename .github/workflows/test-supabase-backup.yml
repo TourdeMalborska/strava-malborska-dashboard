@@ -41,3 +41,15 @@ jobs:
           psql "$DATABASE_URL" \
             -X -v ON_ERROR_STOP=1 \
             -c "SELECT COUNT(*) AS activities_count FROM public.activities;"
+
+psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -c "
+SELECT 'activities' AS table_name, COUNT(*) AS row_count
+FROM public.activities
+UNION ALL
+SELECT 'athletes', COUNT(*) FROM public.athletes
+UNION ALL
+SELECT 'families', COUNT(*) FROM public.families
+UNION ALL
+SELECT 'webhook_events', COUNT(*) FROM public.webhook_events
+ORDER BY table_name;
+"
