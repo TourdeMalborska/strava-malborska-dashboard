@@ -625,3 +625,16 @@ def auth_cancelled():
     </body>
     </html>
     """
+
+# COROS MCP PoC: protected, read-only connectivity test
+from coros_mcp import check_coros_connection
+
+@app.get("/test/coros/connection")
+def test_coros_connection(request: Request):
+    secret = os.getenv("COROS_TEST_SECRET")
+    if not secret:
+        raise HTTPException(status_code=503, detail="Test authentication not configured")
+    provided = request.headers.get("X-Test-Secret", "")
+    if not hmac.compare_digest(provided, secret):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return check_coros_connection()
