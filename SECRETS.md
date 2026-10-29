@@ -34,28 +34,84 @@ project `tourdemalborska`.
   - `/app`    → application runtime secrets, synced to **Vercel**
   - `/backup` → backup workflow secrets, synced to **GitHub Actions**
 
+### Ownership domains (who manages which Vercel env vars)
+
+Vercel's Production env holds three distinct groups. Keeping them separate is
+the core of the architecture:
+
+1. **Infisical-owned (app secrets):** the app's own Strava/Supabase/cron/GitHub/
+   Garmin/COROS keys. Infisical is the source of truth and pushes these to
+   Vercel. See `prod/app` below.
+2. **Vercel–Supabase integration-owned:** `POSTGRES_*`, `NEXT_PUBLIC_*`,
+   `SUPABASE_ANON/JWT/SECRET/PUBLISHABLE_*`. Auto-managed by the integration —
+   Infisical must leave these alone.
+3. **GitHub Actions-owned (backup):** lives in the repo, not Vercel. See
+   `prod/backup` below.
+
 ## `prod/app` — application runtime (synced to Vercel)
 
 Consumed by the FastAPI app (`api/index.py`, `config.py`, `strava.py`,
 `coros_mcp.py`). Also the source for local development via `infisical run`.
 
-| Key | Consumed in | Secret? | In Infisical? | Notes |
-|---|---|---|---|---|
-| `SUPABASE_URL` | `config.py` | secret | ✅ seeded | Supabase project URL. |
-| `SUPABASE_SERVICE_ROLE_KEY` | `config.py` | secret | ✅ seeded | Service-role key — server-side only. |
-| `STRAVA_CLIENT_ID` | `config.py`, `api/index.py`, `strava.py` | secret | ✅ seeded | Strava OAuth app ID. |
-| `STRAVA_CLIENT_SECRET` | `config.py`, `api/index.py`, `strava.py` | secret | ✅ seeded | Strava OAuth app secret. |
-| `STRAVA_VERIFY_TOKEN` | `config.py`, `api/index.py` | secret | ✅ seeded | Strava webhook verification token. |
-| `STRAVA_REDIRECT_URI` | `config.py` | config | ⬜ TODO | Optional; defaults to the Vercel prod callback. |
-| `CRON_SECRET` | `api/index.py` | secret | ⬜ TODO | Bearer token guarding `/sync/daily`. |
-| `GITHUB_BACKUP_TOKEN` | `api/index.py` | secret | ⬜ TODO | PAT to dispatch the backup workflow. |
-| `COROS_TEST_SECRET` | `api/index.py` | secret | ⬜ TODO | Guards `/test/coros/connection`. |
-| `COROS_MCP_URL` | `coros_mcp.py` | config | ⬜ TODO | Optional; defaults to the EU COROS MCP URL. |
-| `STRAVA_ACCESS_TOKEN` | `api/index.py` | secret | ⬜ TODO | Test-only (`/activities`); not needed in normal operation. |
+These are the application's **own** secrets — Infisical owns them and pushes
+them into Vercel. (This is distinct from the Vercel–Supabase integration vars,
+which Infisical must NOT manage — see the section below.)
 
-> The ⬜ TODO rows currently live only in Vercel's env settings. Add them to
-> Infisical `prod/app` so Infisical becomes the complete source of truth, then
-> let the Vercel integration push them back.
+| Key | Consumed in | Vercel type | In Infisical? | In Vercel? | Notes |
+|---|---|---|---|---|---|
+| `SUPABASE_URL` | `config.py` | Config | ✅ seeded | ✅ | Supabase project URL. |
+| `SUPABASE_SERVICE_ROLE_KEY` | `config.py` | Secret | ✅ seeded | ✅ | Service-role key — server-side only. |
+| `STRAVA_CLIENT_ID` | `config.py`, `api/index.py`, `strava.py` | Secret | ✅ seeded | ✅ | Strava OAuth app ID. |
+| `STRAVA_CLIENT_SECRET` | `config.py`, `api/index.py`, `strava.py` | Secret | ✅ seeded | ✅ | Strava OAuth app secret. |
+| `STRAVA_VERIFY_TOKEN` | `config.py`, `api/index.py` | Secret | ✅ seeded | ✅ | Strava webhook verification token. |
+| `STRAVA_REDIRECT_URI` | `config.py` | Config | ⬜ TODO | ✅ | Optional; defaults to the Vercel prod callback. |
+| `CRON_SECRET` | `api/index.py` | Secret | ⬜ TODO | ✅ | Bearer token guarding `/sync/daily`. |
+| `GITHUB_BACKUP_TOKEN` | `api/index.py` | Secret | ⬜ TODO | ✅ | PAT to dispatch the backup workflow. |
+| `GARMIN_API_KEY` | (not in code yet) | Secret | ⬜ TODO | ✅ | Garmin provider groundwork; no code reference yet. |
+| `COROS_TEST_SECRET` | `api/index.py` | Secret | ⬜ TODO | ❌ **missing** | Guards `/test/coros/connection`. Endpoint 503s in prod without it. |
+| `COROS_MCP_URL` | `coros_mcp.py` | Config | ⬜ TODO | ❌ missing | Optional; defaults to the EU COROS MCP URL. |
+| `STRAVA_ACCESS_TOKEN` | `api/index.py` | Secret | ⬜ optional | ❌ missing | Test-only (`/activities`); not needed in normal operation. |
+
+> **⬜ TODO rows that exist in Vercel**: add them to Infisical `prod/app` so
+> Infisical is the complete source of truth, then let the Vercel integration
+> push them back.
+>
+> **❌ missing rows**: `COROS_TEST_SECRET` / `COROS_MCP_URL` are read by the
+> code but are **not set in Vercel** — the COROS test endpoint cannot work in
+> production until they are added (to Infisical, then pushed). `STRAVA_ACCESS_TOKEN`
+> is test-only and can be skipped.
+
+## Vercel–Supabase integration vars (NOT managed by Infisical)
+
+When Supabase is connected to Vercel, the integration automatically injects the
+following into the Vercel project. **Infisical must not own or push these** —
+doing so would conflict with the integration, which overwrites them on its own
+schedule. Leave them entirely to the Vercel–Supabase integration.
+
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `POSTGRES_DATABASE`
+- `POSTGRES_HOST`
+- `POSTGRES_PASSWORD`
+- `POSTGRES_PRISMA_URL`
+- `POSTGRES_URL`
+- `POSTGRES_URL_NON_POOLING`
+- `POSTGRES_USER`
+- `SUPABASE_ANON_KEY`
+- `SUPABASE_JWT_SECRET`
+- `SUPABASE_PUBLISHABLE_KEY`
+- `SUPABASE_SECRET_KEY`
+
+Notes:
+- The current FastAPI code only reads `SUPABASE_URL` and
+  `SUPABASE_SERVICE_ROLE_KEY` from this provider; it does not use the
+  `POSTGRES_*` or `NEXT_PUBLIC_*` vars. Those exist because the integration adds
+  a full set by default.
+- `POSTGRES_URL` / `POSTGRES_URL_NON_POOLING` are the direct Postgres connection
+  strings. The backup workflow's `SUPABASE_DB_URL` (in GitHub, see below) is a
+  dedicated connection string for the restricted `malborska_backup` role — keep
+  it separate; do not reuse an integration-managed URL for backups.
 
 ## `prod/backup` — backup workflow (synced to GitHub Actions)
 
