@@ -131,6 +131,9 @@ def save_activities(activities: List[Dict[str, Any]]) -> Dict[str, Any]:
             "sport_type": activity.get("sport_type"),
             "activity_name": activity.get("name"),
             "manual": activity.get("manual"),
+            # Provenance: which provider this activity was ingested from.
+            # Enables cross-provider dedup and measuring per-source volume.
+            "source": "strava",
             "raw": activity
         })
 
