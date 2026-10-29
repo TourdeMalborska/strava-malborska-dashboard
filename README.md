@@ -135,6 +135,36 @@ Dla aktywności aplikacja przetwarza minimalny zestaw danych wymagany przez rank
 - Dostęp do tokenów i danych zawodników w Supabase powinien być ograniczony do komponentów, które rzeczywiście ich potrzebują.
 - Aplikacja powinna umożliwiać wycofanie zgody i zaprzestanie kolejnych synchronizacji zawodnika.
 
+## Zarządzanie sekretami (Infisical)
+
+Sekrety są zarządzane centralnie w Infisical (projekt `tourdemalborska`, Cloud, region EU). Infisical jest jedynym źródłem prawdy, a wartości są **wypychane** (push/sync) do poszczególnych integracji. Dzięki temu aplikacja i workflow CI nadal odczytują zwykłe zmienne środowiskowe — kod nie wymaga żadnych zmian i nie zależy od Infisical w czasie działania.
+
+### Układ w Infisical
+
+- Projekt: `tourdemalborska`
+- Środowiska: `dev`, `prod` (oraz dodatkowe, jeśli potrzebne)
+- Foldery:
+  - `/app` — sekrety aplikacji, synchronizowane do **Vercel**
+  - `/backup` — sekrety workflow kopii zapasowej, synchronizowane do **GitHub Actions**
+
+Pełny wykaz kluczy i miejsc ich użycia znajduje się w pliku [`SECRETS.md`](SECRETS.md). Szablon nazw zmiennych znajduje się w [`.env.example`](.env.example).
+
+### Uruchomienie lokalne przez Infisical
+
+Zalecane (bez lokalnego pliku `.env`):
+
+```powershell
+infisical run --env=dev --path=/app -- uvicorn api.index:app --reload
+```
+
+Jeśli konieczne jest wygenerowanie lokalnego `.env` (praca offline):
+
+```powershell
+infisical export --env=dev --path=/app --format=dotenv > .env
+```
+
+Plik `.env` pozostaje wykluczony przez `.gitignore`.
+
 ## Aktualny status
 
 - [x] Utworzone repozytorium GitHub.
