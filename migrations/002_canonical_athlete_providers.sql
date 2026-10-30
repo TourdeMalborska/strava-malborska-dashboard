@@ -148,3 +148,54 @@ create index if not exists oauth_states_expires_idx
 -- Note: legacy columns (athletes.access_token/refresh_token/expires_at/
 -- strava_athlete_id, activities.strava_athlete_id) are intentionally retained.
 -- They are removed in migration 003 after the application cutover is verified.
+
+-- 5. Row Level Security on the NEW tables ---------------------------------
+--
+-- CRITICAL: new tables are created with RLS DISABLED by default. Both new
+-- tables hold sensitive data (OAuth access/refresh tokens; PKCE verifiers), so
+-- we lock them down.
+--
+-- The application accesses Supabase exclusively via the SERVICE ROLE key
+-- (see config.py). The service role BYPASSES RLS, so enabling RLS with NO
+-- permissive policies gives the desired result:
+--   - service role          -> full access (bypasses RLS)
+--   - anon / authenticated   -> no access at all (RLS on, no policy = deny)
+-- This keeps tokens strictly server-side.
+--
+-- Reporting (Google Looker/Data Studio) reads a dedicated VIEW via a dedicated
+-- account, NOT these base tables, so locking these tables does not affect it.
+
+alter table public.athlete_providers enable row level security;
+alter table public.oauth_states      enable row level security;
+
+-- Force RLS so even the table owner is subject to it. Belt-and-suspenders for
+-- token data. (The service role still bypasses RLS.)
+alter table public.athlete_providers force row level security;
+alter table public.oauth_states      force row level security;
+
+-- Defense-in-depth: revoke any direct API-role grants Supabase may auto-create
+-- for new tables, so they are never reachable through the public API.
+revoke all on public.athlete_providers from anon, authenticated;
+revoke all on public.oauth_states      from anon, authenticated;
+
+-- Intentionally NO anon/authenticated policies are created: with RLS enabled
+-- and no policy, those roles are denied. The service role is unaffected.
+
+-- 6. RLS posture of EXISTING tables (athletes, activities) ----------------
+--
+-- RLS is a TABLE-level setting; the new athlete_id columns inherit whatever
+-- policies already exist on athletes/activities. This migration does NOT alter
+-- those tables' RLS, so your current posture (and the reporting view) is
+-- preserved. Inspect the baseline before running if desired:
+--
+--   select schemaname, tablename, rowsecurity
+--   from pg_tables where schemaname = 'public'
+--     and tablename in ('athletes','activities','athlete_providers','oauth_states');
+--
+--   select tablename, policyname, roles, cmd, qual
+--   from pg_policies where schemaname = 'public' order by tablename, policyname;
+
+-- Note: legacy columns (athletes.access_token/refresh_token/expires_at/
+-- strava_athlete_id, activities.strava_athlete_id) are intentionally retained.
+-- They are removed in migration 003 after the application cutover is verified,
+-- AFTER confirming the reporting view does not reference them.
