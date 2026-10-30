@@ -167,18 +167,38 @@ Plik `.env` pozostaje wykluczony przez `.gitignore`.
 
 ## Aktualny status
 
+### Zrealizowane
+
 - [x] Utworzone repozytorium GitHub.
 - [x] Skonfigurowane automatyczne wdrożenie z gałęzi `main` do Vercel.
 - [x] Działająca aplikacja FastAPI na Vercel.
 - [x] Publiczny endpoint zwracający `{"status": "running"}`.
+- [x] Implementacja Strava OAuth (`/auth/strava` + callback).
+- [x] Bezpieczny zapis tokenów (centralnie w Infisical; w bazie w tabeli
+      `athlete_providers` z włączonym RLS — tokeny nie są dostępne publicznie).
+- [x] Implementacja codziennej synchronizacji o 00:01 (cron Vercel, chroniony
+      `CRON_SECRET`).
+- [x] Pobieranie wyłącznie aktywności z poprzedniego dnia.
+- [x] Zapis aktywności do Supabase bez duplikatów (upsert po `activity_id`).
+- [x] Model wieloproviderowy: kanoniczne `athlete_id`, tabela
+      `athlete_providers`, pole `source` na aktywnościach (migracje 001/002).
+- [x] Integracja COROS (MCP + OAuth 2.0 PKCE): rejestracja klienta, przepływ
+      `/auth/coros`, synchronizacja aktywności ze źródłem `source='coros'`.
+- [x] Kopie zapasowe Supabase do S3 (GitHub Actions) obejmujące
+      `athlete_providers`.
+
+### W toku / do zrobienia
+
 - [ ] Konfiguracja domeny `tdm.szkolaprzymalborskiej.pl`.
 - [ ] Implementacja regulaminu i rejestracji zgody.
-- [ ] Implementacja Strava OAuth.
-- [ ] Bezpieczny zapis tokenów.
-- [ ] Implementacja codziennej synchronizacji o 00:01.
-- [ ] Pobieranie wyłącznie aktywności z poprzedniego dnia.
-- [ ] Zapis aktywności do Supabase bez duplikatów.
-- [ ] Implementacja rankingu kilometrów.
+- [ ] Implementacja rankingu kilometrów (widok/raport w Looker/Data Studio).
+- [ ] `COROS_CLIENT_ID` w środowisku Vercel (wymagane do działania `/auth/coros`
+      na produkcji).
+- [ ] Weryfikacja end-to-end: realne połączenie konta COROS na produkcji i
+      potwierdzenie aktywności `source='coros'` w rankingu.
+- [ ] Migracja 003: usunięcie przestarzałych kolumn (`strava_athlete_id`,
+      tokeny inline) — po potwierdzeniu, że widok raportowy ich nie używa.
+- [ ] (Przy >20 użytkownikach COROS) rozważenie COROS Partner API zamiast MCP.
 
 ## Poza zakresem MVP
 
@@ -199,10 +219,11 @@ Zainstaluj zależności:
 pip install -r requirements.txt
 ```
 
-Uruchom aplikację z katalogu głównego repozytorium:
+Uruchom aplikację z katalogu głównego repozytorium, wstrzykując sekrety z
+Infisical (brak lokalnego pliku `.env` — patrz `SECRETS.md`):
 
 ```powershell
-uvicorn api.index:app --reload
+infisical run --env=prod --path=/app -- uvicorn api.index:app --reload
 ```
 
 Sprawdź endpoint:
