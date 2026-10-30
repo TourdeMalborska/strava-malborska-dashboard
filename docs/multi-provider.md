@@ -24,18 +24,45 @@ provider. Allowed values are constrained by a CHECK: `strava`, `coros`,
 - Stamped in each provider's save path (`strava.py` sets `source='strava'`).
 - Existing rows backfilled to `'strava'` (all pre-dated multi-provider support).
 
-## Provider identity on athletes (current approach)
+## Provider identity model (current, as of migration 002)
 
-For the MVP, additional-provider tokens are stored as nullable columns on the
-`athletes` table, mirroring the existing Strava token columns (e.g. a future
-`coros_athlete_id`, `coros_access_token`, `coros_refresh_token`,
-`coros_expires_at`). This keeps the model simple for a small, fixed set of
-providers.
+Identity is provider-neutral and app-owned:
 
-**Planned refactor (at scale):** move to an `athlete_providers` table — one row
-per athlete per provider, each with its own tokens and external id. Do this when
-the number of providers/linked accounts makes the per-column approach unwieldy
-(a natural checkpoint is the COROS > 20 users review).
+- **`athletes`** — the canonical person, keyed by `athlete_id` (uuid,
+  `gen_random_uuid()`). Holds only display/profile fields, never tokens.
+- **`athlete_providers`** — one row per (athlete × provider): `provider`,
+  `provider_user_id`, `access_token`, `refresh_token`, `expires_at`, `scope`,
+  `status`, `last_sync`. Unique on `(provider, provider_user_id)`. This is where
+  all tokens live.
+- **`activities.athlete_id`** — canonical link (plus `source` for provenance).
+- **`oauth_states`** — short-lived PKCE/state store for OAuth round-trips.
+
+Per model B, each provider authorization creates its OWN `athletes` row;
+duplicate people across providers are accepted for now (reconciliation later via
+name/email match).
+
+### Access & RLS
+
+- The application accesses Supabase only via the **service-role key**, which
+  bypasses RLS.
+- **Google Looker/Data Studio** reads via a **dedicated DB account through a
+  reporting view** — never the base tables directly, and never the token tables.
+- `athlete_providers` and `oauth_states` hold secrets, so migration 002 enables
+  (and forces) RLS on them with **no anon/authenticated policies** and revokes
+  those roles' grants → service-role-only. Reporting is unaffected (it reads a
+  view, not these tables).
+
+### Reporting-view dependency (constraint on cleanup migration 003)
+
+Looker/Data Studio reads a dedicated reporting view. Before migration 003 drops
+the legacy columns (`athletes.strava_athlete_id` + inline tokens,
+`activities.strava_athlete_id`), confirm the view does not reference them. If it
+does, rewrite the view to use the canonical `athlete_id` first. Inspect with:
+
+```sql
+select table_name, view_definition
+from information_schema.views where table_schema = 'public';
+```
 
 ## COROS integration approach (decision log)
 
