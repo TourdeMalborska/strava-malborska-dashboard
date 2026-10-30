@@ -10,10 +10,11 @@ STRAVA_CLIENT_ID = os.getenv("STRAVA_CLIENT_ID")
 STRAVA_CLIENT_SECRET = os.getenv("STRAVA_CLIENT_SECRET")
 STRAVA_VERIFY_TOKEN = os.getenv("STRAVA_VERIFY_TOKEN")
 
-# Redirect URI can be set in .env to allow local/dev overrides
+# Redirect URI can be set in .env to allow local/dev overrides.
+# Default matches the live production domain (tourdemalborska.vercel.app).
 STRAVA_REDIRECT_URI = os.getenv(
     "STRAVA_REDIRECT_URI",
-    "https://strava-malborska-dashboard.vercel.app/auth/strava/callback"
+    "https://tourdemalborska.vercel.app/auth/strava/callback"
 )
 
 # Supabase client (server side). Use SERVICE ROLE KEY only on trusted server.

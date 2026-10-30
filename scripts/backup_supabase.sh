@@ -39,7 +39,7 @@ SELECT CASE WHEN
   (SELECT count(*) FROM pg_tables
    WHERE schemaname = 'public'
      AND tablename IN
-       ('activities','athletes','families','webhook_events')) = 4
+       ('activities','athletes','families','webhook_events','athlete_providers')) = 5
 THEN 'OK' ELSE 'ERROR' END;
 " | grep -qx "OK"
 
@@ -58,7 +58,7 @@ echo "Checking dump structure..."
 pg_restore --list "$DIR/database.dump" \
   > "$DIR/dump_contents.txt"
 
-for TABLE in activities athletes families webhook_events; do
+for TABLE in activities athletes families webhook_events athlete_providers; do
   if ! grep -Eq "TABLE DATA public ${TABLE} " \
     "$DIR/dump_contents.txt"; then
     echo "ERROR: Missing table data: $TABLE"
