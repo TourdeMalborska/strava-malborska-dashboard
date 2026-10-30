@@ -52,6 +52,24 @@ name/email match).
   those roles' grants → service-role-only. Reporting is unaffected (it reads a
   view, not these tables).
 
+### Backups
+
+Backups run as the restricted `malborska_backup` role via
+`pg_dump --enable-row-security`, so a table is only dumped if that role has a
+SELECT policy on it.
+
+- **`athlete_providers` IS backed up.** It now holds the OAuth tokens that used
+  to live inline on `athletes` (already backed up), so excluding it would
+  silently regress disaster recovery (a restore would disconnect every
+  athlete). Migration 002 grants SELECT + a `malborska_backup` policy, and
+  `scripts/backup_supabase.sh` includes it in the table-count check (now 5) and
+  the data-presence loop.
+- **`oauth_states` is NOT backed up.** Ephemeral 15-minute PKCE rows, no
+  recovery value, kept service-role-only.
+
+Consequence: S3 backups contain live OAuth tokens (as they already did via the
+inline `athletes` columns). Keep S3 backup access controlled accordingly.
+
 ### Reporting-view dependency (constraint on cleanup migration 003)
 
 Looker/Data Studio reads a dedicated reporting view. Before migration 003 drops

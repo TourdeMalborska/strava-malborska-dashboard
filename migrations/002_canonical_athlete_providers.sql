@@ -181,6 +181,46 @@ revoke all on public.oauth_states      from anon, authenticated;
 -- Intentionally NO anon/authenticated policies are created: with RLS enabled
 -- and no policy, those roles are denied. The service role is unaffected.
 
+-- 5b. Backup role access ---------------------------------------------------
+--
+-- The backup workflow connects as the restricted `malborska_backup` role and
+-- runs `pg_dump --enable-row-security`, so it only dumps rows that role can
+-- SELECT. Each existing table has a `malborska_backup_<table>_select` policy.
+--
+-- DECISION (see docs/multi-provider.md):
+--   * athlete_providers IS backed up. After this refactor it holds the OAuth
+--     tokens that previously lived inline on `athletes` (which is already
+--     backed up), so excluding it would silently regress disaster recovery —
+--     a restore would leave every athlete disconnected. It therefore needs a
+--     SELECT grant + policy for malborska_backup.
+--   * oauth_states is NOT backed up. It holds only ephemeral 15-minute PKCE
+--     verifiers with no recovery value, and should stay service-role-only.
+--
+-- NOTE: backing up athlete_providers means S3 backups contain live tokens.
+-- This matches today's posture (inline tokens on `athletes` are already
+-- dumped); keep S3 backup access controlled accordingly.
+
+grant select on public.athlete_providers to malborska_backup;
+
+do $$
+begin
+    if not exists (
+        select 1 from pg_policies
+        where schemaname = 'public'
+          and tablename  = 'athlete_providers'
+          and policyname = 'malborska_backup_athlete_providers_select'
+    ) then
+        create policy malborska_backup_athlete_providers_select
+            on public.athlete_providers
+            for select
+            to malborska_backup
+            using (true);
+    end if;
+end $$;
+
+-- No grant/policy for oauth_states on malborska_backup: intentionally excluded
+-- from backups.
+
 -- 6. RLS posture of EXISTING tables (athletes, activities) ----------------
 --
 -- RLS is a TABLE-level setting; the new athlete_id columns inherit whatever
