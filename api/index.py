@@ -15,11 +15,13 @@ from sync import run_daily_sync, run_rolling_sync
 
 app = FastAPI()
 
+import providers
 from strava import (
-    refresh_athlete_token,
+    refresh_link_token,
     get_activities,
     get_yesterday_activities,
-    save_activities
+    save_activities,
+    normalize_activity,
 )
 
 from config import (
@@ -62,6 +64,80 @@ def auth_strava():
 
     return RedirectResponse(url=url)
 
+
+import coros as coros_provider
+
+
+@app.get("/auth/coros")
+def auth_coros():
+    """
+    Start the COROS OAuth connect flow (model B: COROS is an independent
+    provider). Generates PKCE + state, stores them in oauth_states, and
+    redirects the user to COROS to authorize.
+    """
+    pkce = providers.generate_pkce()
+    state = providers.save_oauth_state(
+        provider="coros",
+        code_verifier=pkce["code_verifier"],
+    )
+    url = coros_provider.build_authorize_url(
+        state=state,
+        code_challenge=pkce["code_challenge"],
+    )
+    return RedirectResponse(url=url)
+
+
+@app.get("/auth/coros/callback")
+def coros_callback(code: str = None, state: str = None, error: str = None):
+    """
+    COROS OAuth callback. Validates state, exchanges the code (PKCE), resolves
+    the COROS account identity, and stores an athlete_providers link for a new
+    canonical athlete (or reuses the existing one on reconnect).
+    """
+    if error or not code or not state:
+        return RedirectResponse(url="/auth-cancelled", status_code=302)
+
+    state_row = providers.consume_oauth_state(state, provider="coros")
+    if not state_row:
+        # Invalid/expired/replayed state.
+        raise HTTPException(status_code=400, detail="Invalid or expired OAuth state")
+
+    token_data = coros_provider.exchange_code(
+        code=code,
+        code_verifier=state_row["code_verifier"],
+    )
+
+    # Resolve the COROS account identity for the provider link key.
+    coros_user_id = coros_provider.resolve_user_id(token_data)
+
+    expires_at_iso = None
+    if token_data.get("expires_in"):
+        from datetime import timedelta
+        expires_at_iso = (
+            datetime.now(timezone.utc) + timedelta(seconds=int(token_data["expires_in"]))
+        ).isoformat()
+
+    existing = providers.find_provider_link("coros", coros_user_id)
+    if existing:
+        athlete_id = existing["athlete_id"]
+    else:
+        # Model B: a COROS authorization creates its own canonical athlete.
+        profile = coros_provider.fetch_profile(token_data.get("access_token"))
+        athlete_id = providers.create_athlete(profile)
+
+    providers.link_provider(
+        athlete_id=athlete_id,
+        provider="coros",
+        provider_user_id=coros_user_id,
+        access_token=token_data.get("access_token"),
+        refresh_token=token_data.get("refresh_token"),
+        expires_at_iso=expires_at_iso,
+        scope=token_data.get("scope", coros_provider.COROS_SCOPES),
+    )
+
+    return RedirectResponse(url="/auth-success", status_code=302)
+
+
 from datetime import datetime
 
 
@@ -88,32 +164,36 @@ def strava_callback(
     )
 
     token_data = response.json()
-#    print("TOKEN DATA:")
-#    print(token_data)
-
     athlete = token_data["athlete"]
+    strava_user_id = str(athlete["id"])
 
-    supabase.table("athletes").upsert({
-        "strava_athlete_id": athlete["id"],
-        "firstname": athlete["firstname"],
-        "lastname": athlete["lastname"],
-        "email": athlete.get("email"),
-        "profile_picture": athlete.get("profile"),
-        "timezone": athlete.get("timezone"),
-        "country": athlete.get("country"),
-	"sex": athlete.get("sex"),
-        "city": athlete.get("city"),
-        "access_token": token_data["access_token"],
-        "refresh_token": token_data["refresh_token"],
-        "expires_at": datetime.utcfromtimestamp(token_data["expires_at"]).isoformat(),
-        "consent_date": datetime.utcnow().isoformat(),
-        "active": True,
-        "status": "active",
-        "error_message": None,
-        "last_sync": None,
-        "updated_at": datetime.utcnow().isoformat(),
-        "revoked_at": None
-    }).execute()
+    # Canonical model: an athlete_providers row links this Strava account to a
+    # canonical athlete. Reconnect reuses the existing athlete; a first-time
+    # connect creates a new canonical athlete (model B).
+    existing = providers.find_provider_link("strava", strava_user_id)
+    if existing:
+        athlete_id = existing["athlete_id"]
+    else:
+        athlete_id = providers.create_athlete({
+            "firstname": athlete.get("firstname"),
+            "lastname": athlete.get("lastname"),
+            "email": athlete.get("email"),
+            "profile_picture": athlete.get("profile"),
+            "timezone": athlete.get("timezone"),
+            "country": athlete.get("country"),
+            "sex": athlete.get("sex"),
+            "city": athlete.get("city"),
+        })
+
+    providers.link_provider(
+        athlete_id=athlete_id,
+        provider="strava",
+        provider_user_id=strava_user_id,
+        access_token=token_data["access_token"],
+        refresh_token=token_data["refresh_token"],
+        expires_at_iso=providers.epoch_to_iso(token_data["expires_at"]),
+        scope="read,activity:read",
+    )
 
     return RedirectResponse(
         url="/auth-success",
@@ -122,14 +202,17 @@ def strava_callback(
 
 @app.get("/athletes")
 def get_athletes():
-
+    # Select explicit profile columns only — never expose tokens (tokens now
+    # live on athlete_providers, but stay explicit to avoid future leaks).
     result = (
         supabase
         .table("athletes")
-        .select("*")
+        .select(
+            "athlete_id,firstname,lastname,email,sex,city,country,"
+            "timezone,profile_picture,active,status,created_at,updated_at"
+        )
         .execute()
     )
-
     return result.data
 
 @app.get("/activities")
@@ -156,189 +239,74 @@ def activities():
 #        "status": "oauth_success",
 #        "authorization_code": code
 #    }
-# @app.get("/test-refresh")
-# def test_refresh():
+def _first_strava_link():
+    """Helper for test endpoints: first active Strava provider link, or None."""
+    links = providers.list_active_links(provider="strava")
+    return links[0] if links else None
 
-    # athlete = (
-        # supabase
-        # .table("athletes")
-        # .select("*")
-        # .limit(1)
-        # .execute()
-        # .data[0]
-    # )
 
-    # token_data = refresh_access_token(
-        # athlete["refresh_token"]
-    # )
-
-    # expires_at = datetime.fromtimestamp(
-        # token_data["expires_at"]
-    # )
-    
-    # supabase.table("athletes").update(
-        # {
-            # "refresh_token": token_data["refresh_token"],
-            # "expires_at": expires_at.isoformat()
-        # }
-    # ).eq(
-        # "strava_athlete_id",
-        # athlete["strava_athlete_id"]
-    # ).execute()
-    
-    # return {
-        # "status": "ok",
-        # "strava_athlete_id": athlete["strava_athlete_id"],
-        # "expires_at": expires_at.isoformat()
-    # }
-    
 @app.get("/test-refresh")
 def test_refresh():
+    link = _first_strava_link()
+    if not link:
+        raise HTTPException(status_code=404, detail="No active Strava link")
+    access_token = refresh_link_token(link)
+    return {"status": "ok", "athlete_id": link["athlete_id"],
+            "provider_user_id": link["provider_user_id"]}
 
-    athlete = (
-        supabase
-        .table("athletes")
-        .select("*")
-        .limit(1)
-        .execute()
-        .data[0]
-    )
 
-    return refresh_athlete_token(athlete)
-    
 @app.get("/test-activities")
 def test_activities():
+    link = _first_strava_link()
+    if not link:
+        raise HTTPException(status_code=404, detail="No active Strava link")
+    access_token = refresh_link_token(link)
+    activities = get_activities(access_token)
+    return activities[0] if activities else {"count": 0}
 
-    athlete = (
-        supabase
-        .table("athletes")
-        .select("*")
-        .limit(1)
-        .execute()
-        .data[0]
-    )
 
-    access_token = refresh_athlete_token(
-        athlete
-    )
-
-    activities = get_activities(
-#        athlete["access_token"]
-         access_token 
- )
-    return activities[0]
-    # return {
-        # "count": len(activities)
-    # }
-    
 @app.get("/test-save-activities")
 def test_save_activities():
-
-    athlete = (
-        supabase
-        .table("athletes")
-        .select("*")
-        .limit(1)
-        .execute()
-        .data[0]
-    )
-
-    access_token = refresh_athlete_token(
-        athlete
-    )
-
-    activities = get_activities(
-        access_token
-    )
-
-    save_activities(
-        activities
-    )
-
+    link = _first_strava_link()
+    if not link:
+        raise HTTPException(status_code=404, detail="No active Strava link")
+    access_token = refresh_link_token(link)
+    activities = get_activities(access_token)
+    result = save_activities(activities, athlete_id=link["athlete_id"])
     return {
         "status": "saved",
-        "activity_id": activities[0]["id"]
+        "count": result.get("count", 0),
+        "activity_id": activities[0]["id"] if activities else None,
     }
-    
+
+
 @app.get("/test-yesterday")
 def test_yesterday():
-
-    athlete = (
-        supabase
-        .table("athletes")
-        .select("*")
-        .limit(1)
-        .execute()
-        .data[0]
-    )
-    
-    access_token = refresh_athlete_token(
-        athlete
-    )
-
-    activities = get_yesterday_activities(
-        access_token
-    )
-
-    return {
-        "count": len(activities)
-    }
-
-#---------------------------
-#Temp endpoint for testing revoked tokens
-#---------------------------
-
-
-# @app.get("/test-athlete/{index}")
-# def test_athlete(index: int):
-
-    # athlete = (
-        # supabase
-        # .table("athletes")
-        # .select("*")
-        # .execute()
-        # .data[index]
-    # )
-
-    # access_token = refresh_athlete_token(
-        # athlete
-    # )
-
-    # activities = get_activities(
-        # access_token
-    # )
-
-    # return {
-    # "athlete_id": athlete["strava_athlete_id"],
-    # "firstname": athlete["firstname"],
-    # "lastname": athlete["lastname"],
-    # "activities_found": len(activities),
-    # "first_activity_id": (
-        # activities[0]["id"]
-        # if activities else None
-    # )
-# }
-
-#Temp test athlete id
+    link = _first_strava_link()
+    if not link:
+        raise HTTPException(status_code=404, detail="No active Strava link")
+    access_token = refresh_link_token(link)
+    activities = get_yesterday_activities(access_token)
+    return {"count": len(activities)}
 
 @app.get("/test-athlete/{index}")
 def test_athlete(index: int):
-
     athletes = (
         supabase
         .table("athletes")
-        .select("*")
+        .select("athlete_id,firstname,lastname")
         .execute()
         .data
     )
+    if index < 0 or index >= len(athletes):
+        raise HTTPException(status_code=404, detail="Athlete index out of range")
 
     athlete = athletes[index]
-
     return {
         "index": index,
-        "athlete_id": athlete["strava_athlete_id"],
+        "athlete_id": athlete["athlete_id"],
         "firstname": athlete["firstname"],
-        "lastname": athlete["lastname"]
+        "lastname": athlete["lastname"],
     }
 
 
@@ -498,28 +466,13 @@ async def strava_webhook_event(request: Request):
 
     if is_revoke_event:
         athlete_id = object_id or owner_id
-        revoked_at = datetime.now(timezone.utc).isoformat()
 
         try:
-            result = (
-                supabase
-                .table("athletes")
-                .update({
-                    "active": False,
-                    "status": "revoked",
-                    "revoked_at": revoked_at,
-                    "access_token": None,
-                    "refresh_token": None,
-                    "updated_at": revoked_at,
-                    "error_message": None
-                })
-                .eq("strava_athlete_id", athlete_id)
-                .execute()
-            )
+            updated_rows = providers.revoke_provider("strava", athlete_id)
 
             print(
-                f"ATHLETE REVOKED: athlete_id={athlete_id}, "
-                f"updated_rows={len(result.data or [])}"
+                f"ATHLETE REVOKED: strava_user_id={athlete_id}, "
+                f"updated_rows={updated_rows}"
             )
 
         except Exception as e:
