@@ -23,10 +23,12 @@ Discovery (https://mcpeu.coros.com/.well-known/oauth-authorization-server):
 """
 
 import os
+import re
 import json
 import urllib.parse
 import requests
-from typing import Dict, Any
+from datetime import datetime, timezone, timedelta
+from typing import Dict, Any, List
 
 # -------------------------
 # Endpoints / configuration
@@ -230,63 +232,243 @@ def mcp_query_user_info(access_token: str) -> Dict[str, Any]:
     }, req_id=2)
 
 
-def resolve_user_id(token_data: Dict[str, Any]) -> str:
-    """
-    Derive a stable COROS account id to key the provider link.
-
-    Prefers the id_token 'sub' claim (no extra network call). Falls back to the
-    MCP queryUserInfo tool if no id_token is present.
-    """
-    id_token = token_data.get("id_token")
-    if id_token:
-        sub = _jwt_sub(id_token)
-        if sub:
-            return sub
-
-    # Fallback: ask the MCP server who this token belongs to.
+def _jwt_claims(token: str) -> Dict[str, Any]:
+    """Decode the (unverified) payload of a JWT. Used only to read identity
+    claims from COROS's access token; signature is not validated because the
+    token came directly from the token endpoint over TLS."""
     try:
-        info = mcp_query_user_info(token_data.get("access_token"))
-        text = json.dumps(info)
-        # Best-effort: use a hash of the profile if no explicit id is exposed.
-        import hashlib as _hashlib
-        return "coros_" + _hashlib.sha256(text.encode()).hexdigest()[:24]
-    except Exception as e:
-        raise RuntimeError(f"Could not resolve COROS user id: {e}")
-
-
-def _jwt_sub(id_token: str):
-    """Extract the 'sub' claim from an unverified JWT payload (identity only)."""
-    try:
-        parts = id_token.split(".")
+        parts = token.split(".")
         if len(parts) < 2:
-            return None
+            return {}
         import base64 as _b64
         pad = "=" * (-len(parts[1]) % 4)
-        payload = json.loads(_b64.urlsafe_b64decode(parts[1] + pad))
-        return payload.get("sub")
+        return json.loads(_b64.urlsafe_b64decode(parts[1] + pad))
     except Exception:
-        return None
+        return {}
+
+
+def resolve_user_id(token_data: Dict[str, Any]) -> str:
+    """
+    Derive the stable COROS account id used to key the provider link.
+
+    Confirmed against real COROS tokens: there is NO id_token, but the
+    access_token is a JWT carrying a 'sub' claim (the stable account id).
+    """
+    access_token = token_data.get("access_token")
+    claims = _jwt_claims(access_token) if access_token else {}
+    sub = claims.get("sub")
+    if not sub:
+        raise RuntimeError("COROS access token has no 'sub' claim to identify the user")
+    return str(sub)
+
+
+def _mcp_text(result: Dict[str, Any]) -> str:
+    """
+    Extract the human-readable text payload from an MCP tools/call result.
+    COROS returns result.content = [{"type":"text","text": "...prose..."}].
+    """
+    try:
+        content = result.get("result", {}).get("content", [])
+        parts = [c.get("text", "") for c in content if c.get("type") == "text"]
+        text = "\n".join(parts)
+        # COROS wraps the body in a JSON string literal; unwrap if so.
+        if text.startswith('"') and text.endswith('"'):
+            try:
+                text = json.loads(text)
+            except json.JSONDecodeError:
+                pass
+        return text
+    except Exception:
+        return ""
 
 
 def fetch_profile(access_token: str) -> Dict[str, Any]:
     """
     Fetch a display profile for a newly-connected COROS athlete via MCP
-    queryUserInfo. Returns the canonical athlete profile shape; falls back to an
-    empty profile if the call fails (the athlete can still be created).
+    queryUserInfo and parse its prose output.
+
+    Real shape (text):
+        User Profile Information
+        ========================
+        Height: 175.0 cm
+        Weight: 60.0 kg
+        Birthday: 1996-10-26 (Age: 30)
+        Gender: Male
+        Nickname: Łukasz
     """
-    profile = {"firstname": None, "lastname": None, "email": None}
+    profile = {"firstname": None, "lastname": None, "email": None, "sex": None}
     try:
         info = mcp_query_user_info(access_token)
-        # queryUserInfo returns profile fields; shape may vary, so map defensively.
-        result = info.get("result", info)
-        content = result.get("content") if isinstance(result, dict) else None
-        if isinstance(content, dict):
-            profile["firstname"] = content.get("firstName") or content.get("firstname")
-            profile["lastname"] = content.get("lastName") or content.get("lastname")
-            profile["sex"] = content.get("gender") or content.get("sex")
+        text = _mcp_text(info)
+
+        nick = re.search(r"Nickname:\s*(.+)", text)
+        if nick:
+            profile["firstname"] = nick.group(1).strip()
+
+        gender = re.search(r"Gender:\s*(\w+)", text)
+        if gender:
+            g = gender.group(1).strip().lower()
+            # Map to the single-char convention used elsewhere (Strava: M/F).
+            profile["sex"] = {"male": "M", "female": "F"}.get(g, gender.group(1).strip())
     except Exception as e:
         print(f"[coros] profile fetch failed, creating minimal athlete: {e}")
     return profile
+
+
+# -------------------------
+# Stage C: activity read + parse
+# -------------------------
+def mcp_query_sport_records(access_token: str, start_date: str, end_date: str,
+                            limit: int = 50) -> Dict[str, Any]:
+    """
+    Call querySportRecords for a date range. Dates are yyyyMMdd in the COROS
+    account timezone. Establishes an MCP session first.
+    """
+    _mcp_call(access_token, "initialize", {
+        "protocolVersion": "2025-06-18",
+        "capabilities": {},
+        "clientInfo": {"name": "tour-de-malborska", "version": "0.1.0"},
+    }, req_id=1)
+    return _mcp_call(access_token, "tools/call", {
+        "name": "querySportRecords",
+        "arguments": {
+            "startDate": start_date,
+            "endDate": end_date,
+            "limit": limit,
+        },
+    }, req_id=2)
+
+
+# Map COROS sport names to a normalized sport_type string for the ranking.
+_COROS_SPORT_NORMALIZE = {
+    "cycling": "Ride",
+    "running": "Run",
+    "trail running": "TrailRun",
+    "swimming": "Swim",
+    "walking": "Walk",
+    "hiking": "Hike",
+}
+
+
+def parse_sport_records(text: str) -> List[Dict[str, Any]]:
+    """
+    Parse the prose output of querySportRecords into activity records.
+
+    COROS returns LLM-oriented text, e.g.:
+
+        Sport Records — 2026-10-24 to 2026-10-30 (1 records)
+        ========================
+
+        1. Cycling — 2026-10-26
+           Location: Kluisbergen Droga rowerowa
+           Start Coordinates: 50.761002, 3.499000
+           Time Window: startTimestamp=1793037600 | endTimestamp=1793040318
+           Duration: 45:18 | Distance: 26.54 km
+           Average Speed: 35.2 km/h | Avg HR: 122 bpm | Calories: 505 kcal
+           LabelId: 481318651069235201 | SportType: 200
+
+    NOTE: this parser depends on COROS's text format. It is inherently more
+    fragile than a REST/JSON API and is a key reason to move to the COROS
+    Partner API if usage grows (see docs/multi-provider.md). Lines that don't
+    parse are skipped rather than failing the whole sync.
+    """
+    records: List[Dict[str, Any]] = []
+    if not text:
+        return records
+
+    # Split into per-activity blocks starting at "N. <Sport> — YYYY-MM-DD".
+    blocks = re.split(r"\n(?=\d+\.\s)", text)
+    for block in blocks:
+        header = re.match(r"\s*\d+\.\s*(.+?)\s*[—-]\s*(\d{4}-\d{2}-\d{2})", block)
+        if not header:
+            continue
+        sport_raw = header.group(1).strip()
+        activity_date = header.group(2).strip()
+
+        label = re.search(r"LabelId:\s*(\d+)", block)
+        if not label:
+            # Without a stable activity id we cannot dedup/upsert; skip.
+            continue
+        activity_id = int(label.group(1))
+
+        dist_km = re.search(r"Distance:\s*([\d.]+)\s*km", block)
+        distance_m = int(round(float(dist_km.group(1)) * 1000)) if dist_km else None
+
+        dur = re.search(r"Duration:\s*([\d:]+)", block)
+        moving_time = _duration_to_seconds(dur.group(1)) if dur else None
+
+        sport_type = _COROS_SPORT_NORMALIZE.get(sport_raw.lower(), sport_raw)
+
+        records.append({
+            "activity_id": activity_id,
+            "activity_date": activity_date,
+            "distance": distance_m,       # metres, matching Strava's unit
+            "moving_time": moving_time,   # seconds
+            "sport_type": sport_type,
+            "activity_name": f"{sport_raw} {activity_date}",
+            "manual": False,
+            "raw": {"provider": "coros", "text_block": block.strip()},
+        })
+    return records
+
+
+def _duration_to_seconds(hms: str):
+    """Convert 'H:MM:SS' or 'MM:SS' to seconds."""
+    try:
+        parts = [int(p) for p in hms.split(":")]
+        if len(parts) == 3:
+            return parts[0] * 3600 + parts[1] * 60 + parts[2]
+        if len(parts) == 2:
+            return parts[0] * 60 + parts[1]
+        if len(parts) == 1:
+            return parts[0]
+    except Exception:
+        return None
+    return None
+
+
+def get_activities_range(access_token: str, start_dt: datetime,
+                         end_dt: datetime) -> List[Dict[str, Any]]:
+    """
+    Fetch and parse COROS activities for a datetime range. Converts to the
+    yyyyMMdd dates COROS expects (COROS interprets them in the account tz; for a
+    daily sync of 'yesterday' this is close enough for ranking purposes).
+    """
+    start_date = start_dt.strftime("%Y%m%d")
+    end_date = end_dt.strftime("%Y%m%d")
+    result = mcp_query_sport_records(access_token, start_date, end_date)
+    return parse_sport_records(_mcp_text(result))
+
+
+def refresh_link_token(link: Dict[str, Any]) -> str:
+    """
+    Refresh a COROS access token for an athlete_providers row and persist the
+    rotated tokens. Returns a valid access_token. Mirrors
+    strava.refresh_link_token but uses the COROS token endpoint.
+
+    COROS: access tokens last ~30 days, refresh tokens ~180 days and rotate on
+    each refresh (the new refresh_token must be stored).
+    """
+    import providers
+
+    token_data = refresh_token(link["refresh_token"])
+    expires_at_iso = None
+    if token_data.get("expires_in"):
+        expires_at_iso = (
+            datetime.now(timezone.utc) + timedelta(seconds=int(token_data["expires_in"]))
+        ).isoformat()
+
+    try:
+        providers.update_provider_tokens(
+            link_id=link["id"],
+            access_token=token_data.get("access_token"),
+            refresh_token=token_data.get("refresh_token"),
+            expires_at_iso=expires_at_iso,
+        )
+    except Exception as e:
+        print(f"[coros] token persist error for link {link.get('id')}: {e}")
+
+    return token_data["access_token"]
 
 
 if __name__ == "__main__":
