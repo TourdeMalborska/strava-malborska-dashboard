@@ -46,14 +46,6 @@ GARMIN_ACTIVITIES_ENDPOINT = (
 # The Personal API key is stored in Infisical (prod/app) as GARMIN_API_KEY.
 GARMIN_API_KEY_ENV = "GARMIN_API_KEY"
 
-# Stable synthetic account id for the Personal API. The Personal API is
-# single-account (one key = one Garmin account), and the activity list does not
-# carry an owner id, so we key the provider link by this constant. If multiple
-# Personal API keys were ever used they would each need a distinct id; for the
-# single-athlete pilot one constant is correct.
-GARMIN_PERSONAL_USER_ID = "garmin_personal_self"
-
-
 # -------------------------
 # Auth: API key -> bearer token
 # -------------------------
@@ -76,6 +68,24 @@ def obtain_token(api_key: str = None) -> str:
     if not token or token.count(".") < 2:
         raise RuntimeError("Garmin token endpoint did not return a JWT")
     return token
+
+
+def get_account_id(access_token: str) -> str:
+    """
+    Return the Garmin account's stable id. The Personal API is single-account
+    and the activity list carries no owner id, so we use the profile
+    `displayName` (an opaque account GUID) as the provider_user_id.
+    """
+    resp = requests.get(
+        f"{GARMIN_HOST}/userprofile-service/userprofile/settings",
+        headers={"Authorization": f"Bearer {access_token}"},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    account_id = (resp.json() or {}).get("displayName")
+    if not account_id:
+        raise RuntimeError("Garmin profile settings did not include an account id")
+    return str(account_id)
 
 
 # -------------------------
