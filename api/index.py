@@ -36,8 +36,17 @@ class StatusResponse(BaseModel):
 
 	status: str
 
-@app.get("/", response_model=StatusResponse)
+@app.get("/", response_class=HTMLResponse)
 def root():
+    # Athlete-facing connect page (mobile-first). Monitoring/health checks
+    # should target /health (JSON) or /status, not /.
+    from connect_page import render_connect_page
+    return render_connect_page()
+
+
+@app.get("/status", response_model=StatusResponse)
+def status():
+    # Preserves the previous `/` JSON contract for anything that needs it.
     return {
         "status": "running"
     }
