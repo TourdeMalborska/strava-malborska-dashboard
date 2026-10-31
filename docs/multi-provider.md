@@ -135,3 +135,64 @@ activities. **Re-evaluate MCP vs Partner API when COROS users > 20.**
 
 No sync-duration / call-duration tracking is needed at this scale (a handful of
 users polled once daily); provenance (`source`) is the metric that matters.
+
+## Wahoo integration (decision log + distance limitation)
+
+Wahoo Cloud API (https://cloud-api.wahooligan.com/) is OAuth 2.0 (confidential
+client for our app — client secret, no PKCE), clean REST/JSON, per-user like
+Strava. Implemented in `wahoo.py`:
+- authorize/token at `api.wahooligan.com/oauth/{authorize,token}`
+- identity/profile via `GET /v1/user` (fields: `first`, `last`, `gender`,
+  `birth`, `height`, `weight`; NO `email`)
+- activities via `GET /v1/workouts` (list: `id`, `name`, `starts`, `minutes`,
+  `workout_type_id`, inline `workout_summary`)
+- scopes `user_read workouts_read`; current app is **SANDBOX** (test rate
+  limits; a sandbox app cannot convert to production — a separate production app
+  is needed for real multi-athlete use).
+
+### KEY LIMITATION: no distance for third-party-origin workouts
+
+Wahoo's policy (changelog 2025-04-01: Wahoo no longer shares workout summaries
+created by third-party apps) means `workout_summary` — which holds
+`distance_accum`, speed, elevation, etc. — is **null / 401** for any workout
+that originated in another app. Verified live: a test account whose 30 workouts
+all had `fitness_app_id = 1085` (a third-party source) returned NO summary and
+NO distance on any workout, via both the inline field and the
+`/v1/workouts/{id}/workout_summary` endpoint (401 "not authorized to view this
+workout summary").
+
+Consequence for a distance ranking:
+- Wahoo yields `minutes` (duration), type, name — but **distance only for
+  workouts recorded natively on a Wahoo device** (ELEMNT etc.), which carry a
+  populated summary.
+- The integration is correct and future-proof: `normalize_activity` returns
+  `distance = None` when the summary is absent, so no bad data is stored; such
+  activities simply don't contribute km until a real-distance workout exists.
+- **TODO (verify):** test with an activity recorded on a native Wahoo device to
+  confirm `workout_summary.distance_accum` is populated and km flow through.
+- **Possible future workaround:** download the raw `.fit` file
+  (`/v1/workout_file_uploads` / FIT) and parse distance from it — significantly
+  more work (binary parsing); only pursue if native-device coverage proves
+  insufficient.
+
+### Wahoo workout_type_id mapping (from live data)
+
+- `0`  = outdoor cycling  -> counts toward the ranking
+- `1`  = running
+- `12` = MyWhoosh / indoor-virtual ride -> EXCLUDED (simulated distance)
+- `26` = swimming
+Refine against Wahoo's full workout-type reference as needed.
+
+## Backlog: post-authorization UX
+
+After a successful provider authorization, the app currently returns the user
+to the connect page (`/`) with a provider-aware success message (fixed from the
+old behavior that bounced everyone to strava.com). Open decision on the ideal
+destination:
+- Recommended: a "connected" confirmation that keeps the user in the app and
+  offers next steps — primary "Zobacz ranking" (view ranking) + secondary
+  "Połącz kolejne konto" (connect another provider).
+- Needs: the public ranking URL (Looker/Data Studio report, or the future
+  `tdm.szkolaprzymalborskiej.pl`) to wire the "view ranking" button.
+- NOT recommended: returning the user to the provider's own site — the user's
+  destination is the Tour de Malborska ranking, not Wahoo/Strava/Garmin.
