@@ -147,6 +147,60 @@ def coros_callback(code: str = None, state: str = None, error: str = None):
     return RedirectResponse(url="/auth-success?provider=coros", status_code=302)
 
 
+import wahoo as wahoo_provider
+
+
+@app.get("/auth/wahoo")
+def auth_wahoo():
+    """Start the Wahoo OAuth connect flow (confidential client, no PKCE)."""
+    state = providers.save_oauth_state(provider="wahoo", code_verifier=None)
+    return RedirectResponse(url=wahoo_provider.build_authorize_url(state=state))
+
+
+@app.get("/auth/wahoo/callback")
+def wahoo_callback(code: str = None, state: str = None, error: str = None):
+    """
+    Wahoo OAuth callback. Validates state, exchanges the code, resolves the
+    Wahoo account identity, and links it to a canonical athlete (model B).
+    """
+    if error or not code or not state:
+        return RedirectResponse(url="/auth-cancelled?provider=wahoo", status_code=302)
+
+    state_row = providers.consume_oauth_state(state, provider="wahoo")
+    if not state_row:
+        raise HTTPException(status_code=400, detail="Invalid or expired OAuth state")
+
+    token_data = wahoo_provider.exchange_code(code=code)
+    access_token = token_data.get("access_token")
+    wahoo_user_id = wahoo_provider.resolve_user_id(access_token)
+
+    expires_at_iso = None
+    if token_data.get("expires_in"):
+        from datetime import timedelta
+        expires_at_iso = (
+            datetime.now(timezone.utc) + timedelta(seconds=int(token_data["expires_in"]))
+        ).isoformat()
+
+    existing = providers.find_provider_link("wahoo", wahoo_user_id)
+    if existing:
+        athlete_id = existing["athlete_id"]
+    else:
+        profile = wahoo_provider.fetch_profile(access_token)
+        athlete_id = providers.create_athlete(profile, source="wahoo")
+
+    providers.link_provider(
+        athlete_id=athlete_id,
+        provider="wahoo",
+        provider_user_id=wahoo_user_id,
+        access_token=access_token,
+        refresh_token=token_data.get("refresh_token"),
+        expires_at_iso=expires_at_iso,
+        scope=token_data.get("scope", wahoo_provider.WAHOO_SCOPES),
+    )
+
+    return RedirectResponse(url="/auth-success?provider=wahoo", status_code=302)
+
+
 from datetime import datetime
 
 
@@ -529,8 +583,8 @@ async def strava_webhook_event(request: Request):
 _PROVIDER_LABELS = {
     "strava": "Strava",
     "coros": "COROS",
-    "garmin": "Garmin Connect",
     "wahoo": "Wahoo",
+    "garmin": "Garmin Connect",
     "polar": "Polar",
 }
 

@@ -11,6 +11,7 @@ import providers
 import strava
 import coros
 import garmin
+import wahoo
 
 # Per-provider sync handlers. Each returns the number of activities saved.
 def _sync_strava_link(link, start_ts, end_ts) -> int:
@@ -37,11 +38,20 @@ def _sync_garmin_link(link, start_ts, end_ts) -> int:
     return len(activities) if activities else 0
 
 
+def _sync_wahoo_link(link, start_ts, end_ts) -> int:
+    access_token = wahoo.refresh_link_token(link)
+    # wahoo.get_activities_range returns normalized activity records.
+    records = wahoo.get_activities_range(access_token, start_ts, end_ts)
+    providers.save_activities(records, source="wahoo", athlete_id=link["athlete_id"])
+    return len(records) if records else 0
+
+
 # provider -> handler.
 _PROVIDER_SYNC = {
     "strava": _sync_strava_link,
     "coros": _sync_coros_link,
     "garmin": _sync_garmin_link,
+    "wahoo": _sync_wahoo_link,
 }
 
 

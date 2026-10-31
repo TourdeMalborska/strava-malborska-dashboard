@@ -17,8 +17,8 @@ per-user OAuth are shown disabled as "Wkrótce" (coming soon).
 PROVIDERS = [
     ("Strava",           "strava", "/auth/strava", "#FC4C02", "live"),
     ("COROS",            "coros",  "/auth/coros",  "#000000", "live"),
+    ("Wahoo",            "wahoo",  "/auth/wahoo",  "#1E73BE", "live"),
     ("Garmin Connect",   "garmin", None,           "#007CC3", "soon"),
-    ("Wahoo",            "wahoo",  None,           "#1E73BE", "soon"),
     ("Polar",            "polar",  None,           "#E4002B", "soon"),
     ("Hammerhead Karoo", "karoo",  None,           "#111827", "soon"),
     ("Suunto",           "suunto", None,           "#1A1A1A", "soon"),
