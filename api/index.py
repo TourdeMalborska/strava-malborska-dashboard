@@ -412,7 +412,18 @@ def sync_daily(request: Request):
     }
 
 @app.get("/sync/rolling")
-def sync_rolling():
+def sync_rolling(request: Request):
+    # Protected like /sync/daily: requires the CRON_SECRET bearer. The external
+    # scheduler (cron-job.org) must send 'Authorization: Bearer <CRON_SECRET>'.
+    cron_secret = os.getenv("CRON_SECRET")
+    if not cron_secret:
+        raise HTTPException(status_code=503, detail="Cron authentication is not configured")
+
+    authorization = request.headers.get("authorization", "")
+    expected = f"Bearer {cron_secret}"
+    if not hmac.compare_digest(authorization, expected):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
     results = run_rolling_sync()
     return {"mode": "rolling", "results": results}
 

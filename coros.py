@@ -33,11 +33,19 @@ from typing import Dict, Any, List
 # -------------------------
 # Endpoints / configuration
 # -------------------------
-# COROS_MCP_URL is stored in Infisical (prod/app) as the full MCP tool endpoint,
-# e.g. https://mcpeu.coros.com/mcp. We derive the auth host from it so there is
-# a single source of truth. Falls back to the EU host.
-COROS_MCP_URL = os.getenv("COROS_MCP_URL", "https://mcpeu.coros.com/mcp")
-COROS_MCP_HOST = COROS_MCP_URL.rsplit("/mcp", 1)[0] or "https://mcpeu.coros.com"
+# COROS_MCP_URL (Infisical prod/app) may be the MCP host with or without the
+# /mcp suffix (e.g. "https://mcpeu.coros.com" or ".../mcp"). Derive the host
+# robustly via URL parsing (scheme + netloc), then build the MCP tool endpoint
+# and OAuth endpoints from it — don't string-split on "/mcp" (fragile).
+_raw_mcp = os.getenv("COROS_MCP_URL", "https://mcpeu.coros.com/mcp")
+_parsed = urllib.parse.urlparse(_raw_mcp)
+COROS_MCP_HOST = (
+    f"{_parsed.scheme}://{_parsed.netloc}"
+    if _parsed.scheme and _parsed.netloc
+    else "https://mcpeu.coros.com"
+)
+# The MCP tool endpoint is always <host>/mcp regardless of how the env was set.
+COROS_MCP_URL = f"{COROS_MCP_HOST}/mcp"
 
 COROS_AUTHORIZATION_ENDPOINT = f"{COROS_MCP_HOST}/oauth2/authorize"
 COROS_TOKEN_ENDPOINT = f"{COROS_MCP_HOST}/oauth2/token"
