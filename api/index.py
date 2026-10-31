@@ -104,7 +104,7 @@ def coros_callback(code: str = None, state: str = None, error: str = None):
     canonical athlete (or reuses the existing one on reconnect).
     """
     if error or not code or not state:
-        return RedirectResponse(url="/auth-cancelled", status_code=302)
+        return RedirectResponse(url="/auth-cancelled?provider=coros", status_code=302)
 
     state_row = providers.consume_oauth_state(state, provider="coros")
     if not state_row:
@@ -144,7 +144,7 @@ def coros_callback(code: str = None, state: str = None, error: str = None):
         scope=token_data.get("scope", coros_provider.COROS_SCOPES),
     )
 
-    return RedirectResponse(url="/auth-success", status_code=302)
+    return RedirectResponse(url="/auth-success?provider=coros", status_code=302)
 
 
 from datetime import datetime
@@ -158,7 +158,7 @@ def strava_callback(
 
     if not code:
         return RedirectResponse(
-           url="/auth-cancelled",
+           url="/auth-cancelled?provider=strava",
            status_code=302
         )
 
@@ -205,7 +205,7 @@ def strava_callback(
     )
 
     return RedirectResponse(
-        url="/auth-success",
+        url="/auth-success?provider=strava",
         status_code=302
     )
 
@@ -515,78 +515,104 @@ async def strava_webhook_event(request: Request):
         "processed": False
     }
 
+_PROVIDER_LABELS = {
+    "strava": "Strava",
+    "coros": "COROS",
+    "garmin": "Garmin Connect",
+    "wahoo": "Wahoo",
+    "polar": "Polar",
+}
+
+
+def _result_page(title: str, emoji: str, message: str) -> str:
+    # Branded result page (matches the connect landing page). Returns the user
+    # to the connect page (/) — never to a specific provider's site.
+    return f"""<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f44336">
+  <title>Tour de Malborska</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    * {{ box-sizing: border-box; }}
+    html, body {{ margin: 0; padding: 0; }}
+    body {{
+      min-height: 100svh; background: #fafafa; color: #212121;
+      font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      display: flex; flex-direction: column; align-items: center;
+      padding: 0 20px max(28px, env(safe-area-inset-bottom));
+    }}
+    .topbar {{
+      width: 100%; background: #f44336; border-bottom: 4px solid #ffd740;
+      padding: max(16px, env(safe-area-inset-top)) 20px 16px; display: flex; justify-content: center;
+    }}
+    .topbar .org {{
+      max-width: 440px; width: 100%; color: #fff; text-align: center;
+      font-family: 'Montserrat', sans-serif; font-weight: 700; font-size: 0.82rem;
+      letter-spacing: 0.02em; text-transform: uppercase; opacity: 0.95;
+    }}
+    .wrap {{ width: 100%; max-width: 440px; margin: auto; text-align: center; }}
+    .emoji {{ font-size: 3rem; margin: 8px 0 4px; }}
+    h1 {{ font-family: 'Montserrat', sans-serif; font-size: 1.5rem; font-weight: 800; margin: 8px 0; }}
+    p {{ color: #6b6b6b; font-size: 1rem; line-height: 1.5; margin: 8px 0; }}
+    .btn {{
+      display: inline-flex; align-items: center; justify-content: center;
+      margin-top: 22px; padding: 14px 24px; border-radius: 12px;
+      background: #f44336; color: #fff; text-decoration: none;
+      font-family: 'Montserrat', sans-serif; font-weight: 600; font-size: 1rem;
+      min-height: 52px;
+    }}
+    .count {{ font-weight: 700; color: #212121; }}
+  </style>
+  <script>
+    let n = 5;
+    setInterval(() => {{
+      n--;
+      var el = document.getElementById('c');
+      if (el) el.innerText = n;
+      if (n <= 0) window.location.href = '/';
+    }}, 1000);
+  </script>
+</head>
+<body>
+  <header class="topbar"><div class="org">Szkoła przy Malborskiej</div></header>
+  <main class="wrap">
+    <div class="emoji">{emoji}</div>
+    <h1>{title}</h1>
+    <p>{message}</p>
+    <p>Za <span class="count" id="c">5</span> sek. wrócisz na stronę łączenia.</p>
+    <a class="btn" href="/">Wróć teraz</a>
+  </main>
+</body>
+</html>"""
+
+
 @app.get("/auth-success", response_class=HTMLResponse)
-def auth_success():
+def auth_success(provider: str = None):
+    label = _PROVIDER_LABELS.get((provider or "").lower())
+    if label:
+        message = (
+            f"Autoryzacja konta {label} zakończyła się sukcesem. "
+            f"Twoje aktywności będą uwzględniane w rankingu."
+        )
+    else:
+        message = "Autoryzacja zakończyła się sukcesem. Twoje aktywności będą uwzględniane w rankingu."
+    return _result_page("Konto zostało połączone", "✅", message)
 
-    return """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Tour de Malborska</title>
 
-        <script>
-            let countdown = 5;
-
-            setInterval(() => {
-                countdown--;
-
-                document.getElementById("counter").innerText = countdown;
-
-                if (countdown <= 0) {
-                    window.location.href = "https://www.strava.com/dashboard";
-                }
-            }, 1000);
-        </script>
-
-    </head>
-    <body style="
-        font-family: Arial;
-        text-align: center;
-        padding-top: 100px;
-    ">
-
-        <h1>✅ Konto zostało połączone</h1>
-
-        <p>
-            Autoryzacja aplikacji Tour de Malborska zakończyła się sukcesem.
-        </p>
-
-        <p>
-            Za <span id="counter">5</span> sekund wrócisz do Stravy.
-        </p>
-
-    </body>
-    </html>
-    """
-    
 @app.get("/auth-cancelled", response_class=HTMLResponse)
-def auth_cancelled():
-
-    return """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Tour de Malborska</title>
-    </head>
-    <body style="
-        font-family: Arial;
-        text-align: center;
-        padding-top: 100px;
-    ">
-
-        <h1>❌ Autoryzacja anulowana</h1>
-
-        <p>
-            Nie udzielono zgody na połączenie ze Strava.
-        </p>
-
-        <p>
-            Możesz zamknąć okno lub spróbować ponownie.
-        </p>
-
-    </body>
-    </html>
-    """
+def auth_cancelled(provider: str = None):
+    label = _PROVIDER_LABELS.get((provider or "").lower())
+    target = f"konta {label}" if label else "konta"
+    return _result_page(
+        "Autoryzacja anulowana",
+        "⚠️",
+        f"Nie udzielono zgody na połączenie {target}. Możesz spróbować ponownie.",
+    )
 
 # COROS MCP PoC: protected, read-only connectivity test
 from coros_mcp import check_coros_connection
