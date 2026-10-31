@@ -172,27 +172,32 @@ def save_activities(activities: List[Dict[str, Any]], athlete_id: str) -> Dict[s
 # -------------------------
 def ensure_personal_link() -> Dict[str, Any]:
     """
-    Ensure an athlete_providers row exists for the single Personal-API Garmin
-    account, creating a canonical athlete on first run. Returns the link row.
+    Ensure an athlete_providers row exists for the Personal-API Garmin account,
+    creating a canonical athlete on first run. Returns the link row.
 
-    The Personal API uses a long-lived key (not per-call tokens), so we store
-    the derived bearer token's identity marker on a provider link keyed by the
-    constant GARMIN_PERSONAL_USER_ID. The API key itself stays in Infisical, not
-    the DB.
+    Keyed by the real Garmin account id (profile displayName GUID). The Personal
+    API does not expose firstname/lastname, so the canonical athlete keeps a
+    placeholder name ("Garmin" / "(Personal API)"); it can be edited later. The
+    API key stays in Infisical, not the DB — the bearer token is derived on
+    demand at sync time.
     """
-    existing = providers.find_provider_link("garmin", GARMIN_PERSONAL_USER_ID)
+    access_token = obtain_token()
+    account_id = get_account_id(access_token)
+
+    existing = providers.find_provider_link("garmin", account_id)
     if existing:
         return existing
 
     # First run: create a canonical athlete for the Personal API owner.
+    # Garmin provides no human name via this API, so keep a placeholder.
     athlete_id = providers.create_athlete({
         "firstname": "Garmin",
         "lastname": "(Personal API)",
-    })
+    }, source="garmin")
     return providers.link_provider(
         athlete_id=athlete_id,
         provider="garmin",
-        provider_user_id=GARMIN_PERSONAL_USER_ID,
+        provider_user_id=account_id,
         access_token=None,      # token is derived on demand from the API key
         refresh_token=None,
         expires_at_iso=None,

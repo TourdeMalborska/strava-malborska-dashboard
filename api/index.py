@@ -123,7 +123,7 @@ def coros_callback(code: str = None, state: str = None, error: str = None):
     else:
         # Model B: a COROS authorization creates its own canonical athlete.
         profile = coros_provider.fetch_profile(token_data.get("access_token"))
-        athlete_id = providers.create_athlete(profile)
+        athlete_id = providers.create_athlete(profile, source="coros")
 
     providers.link_provider(
         athlete_id=athlete_id,
@@ -183,7 +183,7 @@ def strava_callback(
             "country": athlete.get("country"),
             "sex": athlete.get("sex"),
             "city": athlete.get("city"),
-        })
+        }, source="strava")
 
     providers.link_provider(
         athlete_id=athlete_id,

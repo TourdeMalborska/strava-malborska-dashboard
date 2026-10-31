@@ -40,11 +40,15 @@ def epoch_to_iso(ts: int) -> str:
 # -------------------------
 # Athlete (canonical person)
 # -------------------------
-def create_athlete(profile: Dict[str, Any]) -> str:
+def create_athlete(profile: Dict[str, Any], source: str) -> str:
     """
     Insert a new canonical athlete from a provider profile and return its
     athlete_id (uuid). Only display/profile fields live on the athlete row;
     tokens live on athlete_providers.
+
+    `source` records the ORIGIN provider — which provider this athlete first
+    entered the system through (strava/coros/garmin/wahoo). Distinct from the
+    per-link athlete_providers.provider and the per-activity activities.source.
     """
     row = {
         "firstname": profile.get("firstname"),
@@ -55,6 +59,7 @@ def create_athlete(profile: Dict[str, Any]) -> str:
         "country": profile.get("country"),
         "timezone": profile.get("timezone"),
         "profile_picture": profile.get("profile_picture"),
+        "source": source,
         "active": True,
         "status": "active",
         "consent_date": _now_iso(),
