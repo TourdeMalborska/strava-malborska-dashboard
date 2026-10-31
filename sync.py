@@ -10,6 +10,7 @@ from datetime import datetime, timezone, timedelta
 import providers
 import strava
 import coros
+import garmin
 
 # Per-provider sync handlers. Each returns the number of activities saved.
 def _sync_strava_link(link, start_ts, end_ts) -> int:
@@ -27,10 +28,20 @@ def _sync_coros_link(link, start_ts, end_ts) -> int:
     return len(records) if records else 0
 
 
+def _sync_garmin_link(link, start_ts, end_ts) -> int:
+    # Personal API: the bearer token is derived on demand from the Infisical
+    # API key, not stored per-athlete. No refresh of a persisted token.
+    access_token = garmin.obtain_token()
+    activities = garmin.get_activities_range(access_token, start_ts, end_ts)
+    garmin.save_activities(activities, athlete_id=link["athlete_id"])
+    return len(activities) if activities else 0
+
+
 # provider -> handler.
 _PROVIDER_SYNC = {
     "strava": _sync_strava_link,
     "coros": _sync_coros_link,
+    "garmin": _sync_garmin_link,
 }
 
 

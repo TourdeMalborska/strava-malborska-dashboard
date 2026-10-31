@@ -70,6 +70,38 @@ SELECT policy on it.
 Consequence: S3 backups contain live OAuth tokens (as they already did via the
 inline `athletes` columns). Keep S3 backup access controlled accordingly.
 
+## Garmin integration approach (decision log)
+
+Garmin exposes two relevant surfaces:
+
+- **Personal API** (`garmin.py`, implemented): a single-account API keyed by a
+  Personal API key created on ONE Garmin Connect account. It reads only THAT
+  account's data. No per-user OAuth, no approval. Token flow: `POST
+  .../personal-api/personal-api-key/token` with `Authorization: ApiKey <key>`
+  returns a bearer JWT **as plain text**; data via `GET
+  .../activitylist-service/activities/search/activities` with
+  `Authorization: Bearer <token>` returns **structured JSON** (distance in
+  metres, duration in seconds — no prose parsing, unlike COROS).
+- **Connect Developer Program / Activity API** (future, not implemented):
+  per-user OAuth with end-user consent, up to 1,000 users on Starter Access —
+  the correct path for onboarding many club athletes. Requires applying for and
+  being granted Developer Program access.
+
+**Decision (option 3):** start with the **Personal API as a single-athlete
+pilot** (validates the data shape and the `source='garmin'` path using the
+owner's own account), and pursue the **Developer Program** for true
+multi-athlete onboarding later. The Personal API genuinely cannot onboard other
+club members — each would need their own key — so it is a plumbing/data-shape
+validation, not a club feature.
+
+Implementation notes:
+- API key lives in Infisical (prod/app) as `GARMIN_API_KEY`. Not stored in the DB.
+- The bearer token is derived on demand each sync from the API key (no
+  per-athlete token persisted), keyed by a constant `provider_user_id`
+  (`garmin_personal_self`) via `garmin.ensure_personal_link()`.
+- Verified live: token exchange + activity search both reachable and working
+  from the dev environment (Garmin is not blocked by the corporate proxy).
+
 ### Reporting-view dependency (constraint on cleanup migration 003)
 
 Looker/Data Studio reads a dedicated reporting view. Before migration 003 drops
