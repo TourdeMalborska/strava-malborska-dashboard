@@ -19,6 +19,8 @@
 -- strava_athlete_id is retained (not dropped) until the deferred legacy cleanup.
 -- Run in the Supabase SQL editor. Idempotent.
 
+-- Step 1: drop the primary key on strava_athlete_id (keyed on it by the legacy
+-- model). This does NOT by itself remove the column's explicit NOT NULL.
 do $$
 declare
     pk_name text;
@@ -32,3 +34,10 @@ begin
         execute format('alter table public.athletes drop constraint %I', pk_name);
     end if;
 end $$;
+
+-- Step 2: drop the explicit NOT NULL on strava_athlete_id. This can only run
+-- AFTER the PK above is dropped (a PK column cannot be made nullable). With both
+-- removed, non-Strava (COROS/Garmin) athletes can be created with a NULL
+-- strava_athlete_id.
+alter table public.athletes
+    alter column strava_athlete_id drop not null;
