@@ -253,3 +253,26 @@ case both records shared `started_at = 11:56:51`.
 
 Reference case: ride 2026-11-01 11:56:51Z — records 511618809 (null) and
 511573120 (7.30 km) are the same ride.
+
+## Manual-entry tracking (per provider)
+
+Tracking which activities are manual (entered by hand, not device-recorded)
+matters for data trust. Support varies by provider:
+
+- **Strava**: `activity.manual` boolean — captured reliably.
+- **Garmin**: `isManualActivity` boolean — captured reliably.
+- **Wahoo**: `manual` lives on `workout_summary` (not the workout stub). Captured
+  when a summary is present; `None` (unknown) when the summary is withheld
+  (third-party-origin workouts).
+- **COROS**: ⚠️ `querySportRecords` prose exposes NO manual flag — a manually
+  created COROS activity looks identical to a device-recorded one. The parser
+  sets `manual = None` (unknown), not a misleading False. Reference: activity
+  `481427340851708308` (2026-10-31, 35.16 km) was created manually in COROS but
+  the list gives no indication.
+  - **Consequence:** manual COROS entries cannot be flagged from the list, and a
+    hand-set `manual=true` will be OVERWRITTEN to None on the next sync (upsert).
+  - **TODO:** call the COROS `getActivityDetail` MCP tool per activity to read a
+    manual indicator (needs a live COROS call to verify the detail shape).
+
+`activities.manual` is nullable: True = manual, False = device-recorded,
+None = unknown (provider didn't say).

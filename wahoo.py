@@ -240,6 +240,13 @@ def normalize_activity(workout: Dict[str, Any], summary: Dict[str, Any]) -> Dict
     duration = summary.get("duration_active_accum") or summary.get("duration_total_accum")
     moving_time = int(float(duration)) if duration is not None else None
 
+    # Manual flag lives on the summary (`manual`), not the workout stub. When
+    # there is no summary (third-party-origin workouts), it is unknown -> None.
+    if "manual" in summary:
+        manual = bool(summary.get("manual"))
+    else:
+        manual = None
+
     return {
         "activity_id": workout["id"],
         "activity_date": activity_date,
@@ -247,7 +254,7 @@ def normalize_activity(workout: Dict[str, Any], summary: Dict[str, Any]) -> Dict
         "moving_time": moving_time,      # seconds
         "sport_type": str(workout.get("workout_type_id")),
         "activity_name": workout.get("name"),
-        "manual": bool(workout.get("manual")),
+        "manual": manual,
         "raw": {"workout": workout, "summary": summary},
     }
 

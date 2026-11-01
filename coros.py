@@ -407,6 +407,16 @@ def parse_sport_records(text: str) -> List[Dict[str, Any]]:
 
         sport_type = _COROS_SPORT_NORMALIZE.get(sport_raw.lower(), sport_raw)
 
+        # Manual-entry detection: querySportRecords prose does NOT reliably
+        # include a manual flag (a manually-created COROS activity looks
+        # identical to a device-recorded one). Detect it only if the text
+        # explicitly mentions it; otherwise leave it UNKNOWN (None) rather than
+        # a misleading False. Definitive manual detection would require the
+        # getActivityDetail MCP tool (per-activity call) — see TODO below.
+        manual = None
+        if re.search(r"\bmanual", block, re.IGNORECASE):
+            manual = True
+
         records.append({
             "activity_id": activity_id,
             "activity_date": activity_date,
@@ -414,9 +424,13 @@ def parse_sport_records(text: str) -> List[Dict[str, Any]]:
             "moving_time": moving_time,   # seconds
             "sport_type": sport_type,
             "activity_name": f"{sport_raw} {activity_date}",
-            "manual": False,
+            "manual": manual,             # None = unknown (COROS list limitation)
             "raw": {"provider": "coros", "text_block": block.strip()},
         })
+    # TODO (manual tracking): COROS querySportRecords exposes no manual flag.
+    # To reliably flag manual entries, call the getActivityDetail tool per
+    # activity (extra MCP call) and read its manual indicator. Not implemented
+    # yet — verify the detail response shape first (needs a live COROS call).
     return records
 
 
