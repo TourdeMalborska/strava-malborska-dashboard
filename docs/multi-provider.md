@@ -196,3 +196,60 @@ destination:
   `tdm.szkolaprzymalborskiej.pl`) to wire the "view ranking" button.
 - NOT recommended: returning the user to the provider's own site — the user's
   destination is the Tour de Malborska ranking, not Wahoo/Strava/Garmin.
+
+## Wahoo: duplicate records + where distance actually lives (investigation)
+
+Investigated a real BOLT trainer ride (2026-11-01, "Indoor Cycling", 7.30 km on
+the Wahoo phone app). The Wahoo API `GET /v1/workouts` returned the SAME physical
+ride as TWO separate records:
+
+| record | name | fitness_app_id | plan_id | workout_summary |
+|---|---|---|---|---|
+| `511618809` | Indoor Cycling | 1085 | null | **null** (no metrics) |
+| `511573120` | AE1. Recovery Spin 30min HR. | 1197 (TrainingPeaks) | 18103587 | **full** (7299.5 m, 32:22, etc.) |
+
+Both have `started_at = 2026-11-01T11:56:51Z`, confirming one ride. The summary
+on the TP record even carries `name: "Indoor Cycling"`, `time_zone`, and a FIT
+`file.url` (`...ELEMNT_BOLT_B213...fit`, `fitness_app_id: 1`) — i.e. the ride was
+recorded natively on the BOLT (app 1), attached to the TrainingPeaks plan record
+(1197) which carried the summary. App 1085 is a separate connected partner that
+re-shared a summary-less stub of the same ride.
+
+### Findings
+1. **Distance capture works.** The 7.30 km reached Supabase on record 511573120
+   (`source=wahoo`, `distance=7299.5`). Wahoo DOES provide km for native BOLT
+   rides — via the inline `workout_summary` on the record that carries it.
+2. **Wahoo returns duplicates.** One ride => multiple cloud records (a
+   summary-less stub + the summary-bearing record). The phone app merges them;
+   the API exposes them separately. Both currently save -> the ride is stored
+   twice (once with 7.3 km, once null).
+3. App-id map so far (from live data): `1` = native Wahoo/ELEMNT device file,
+   `30` = Wahoo iOS app (`WAHOOAPPIOS` token), `1197` = TrainingPeaks (confirmed
+   by `plan_id`), `1085` = another connected partner (summary withheld;
+   suspected Strava — confirm in Wahoo app > Authorized Apps).
+
+### OPEN TEST (next)
+Ride a FREE trainer ride (NO TrainingPeaks structured workout) and re-query. The
+question: with no TP/plan record to carry the summary, does the distance still
+come through (e.g. on a native app-1 / app-30 record), or do we only get the
+summary-less stub? This determines whether Wahoo distance depends on the ride
+being tied to a plan, or is available for any native BOLT ride.
+
+## Backlog: cross-record / cross-provider de-duplication
+
+The same physical ride can appear multiple times:
+- Within Wahoo (summary-less stub + summary-bearing record, as above).
+- Across providers (Strava + Garmin + COROS + Wahoo copies of one ride, since
+  devices/apps auto-share to each other).
+
+Without dedup the ranking will double-count. Deferred for now (beta), but needed
+before the ranking is trusted.
+
+Proposed match key (candidate): same `athlete_id` + same activity start time
+(to the second) + same distance (within a small tolerance). Resolution rule:
+keep ONE record, preferring the copy that HAS distance/summary; discard
+summary-less duplicates. Start time is the most reliable join — in the Wahoo
+case both records shared `started_at = 11:56:51`.
+
+Reference case: ride 2026-11-01 11:56:51Z — records 511618809 (null) and
+511573120 (7.30 km) are the same ride.
