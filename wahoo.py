@@ -196,8 +196,15 @@ def _parse_ts(value) -> Optional[datetime]:
 def get_activities_range(access_token: str, start_dt: datetime,
                          end_dt: datetime) -> List[Dict[str, Any]]:
     """
-    Fetch workouts starting in [start_dt, end_dt], enrich each with its
-    workout_summary (distance), return normalized activity records.
+    Fetch workouts starting in [start_dt, end_dt] and return normalized activity
+    records.
+
+    The workout_summary (distance etc.) is read from the INLINE `workout_summary`
+    field on each workout object. We do NOT call the separate
+    /v1/workouts/{id}/workout_summary endpoint: it returns 401 for workouts that
+    originated in third-party apps (Wahoo policy), which would abort the sync.
+    Inline summary is null for those workouts -> distance comes back None, which
+    is handled gracefully (the activity is still recorded, just without km).
     """
     records: List[Dict[str, Any]] = []
     page = 1
@@ -215,7 +222,7 @@ def get_activities_range(access_token: str, start_dt: datetime,
                 break
             if starts > end_dt:
                 continue
-            summary = get_workout_summary(access_token, w["id"]) or {}
+            summary = w.get("workout_summary") or {}
             records.append(normalize_activity(w, summary))
         if stop or len(workouts) < 50:
             break
