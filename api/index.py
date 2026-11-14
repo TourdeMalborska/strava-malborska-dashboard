@@ -241,11 +241,8 @@ def strava_callback(
             "firstname": athlete.get("firstname"),
             "lastname": athlete.get("lastname"),
             "email": athlete.get("email"),
-            "profile_picture": athlete.get("profile"),
             "timezone": athlete.get("timezone"),
-            "country": athlete.get("country"),
             "sex": athlete.get("sex"),
-            "city": athlete.get("city"),
         }, source="strava")
 
     providers.link_provider(
@@ -271,8 +268,8 @@ def get_athletes():
         supabase
         .table("athletes")
         .select(
-            "athlete_id,firstname,lastname,email,sex,city,country,"
-            "timezone,profile_picture,active,status,created_at,updated_at"
+            "athlete_id,firstname,lastname,email,sex,"
+            "timezone,active,status,created_at,updated_at"
         )
         .execute()
     )
