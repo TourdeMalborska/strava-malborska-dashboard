@@ -85,6 +85,22 @@ def sync_link(link, start_ts, end_ts):
                 "count": 0, "error": err}
 
 
+# Strava API Policy 6.2: Strava data may be cached for at most 7 days. Older
+# Strava activities are folded into monthly totals and deleted on every sync.
+STRAVA_KEEP_DAYS = 7
+
+
+def enforce_retention():
+    """Roll up + delete Strava activities older than STRAVA_KEEP_DAYS.
+    Never raises: a retention failure must not break syncing (it is retried on
+    the next run and logged here)."""
+    try:
+        res = providers.rollup_old_activities("strava", STRAVA_KEEP_DAYS)
+        print(f"[retention] strava rollup: {res}")
+    except Exception as e:
+        print(f"[retention] ERROR rollup failed: {e}")
+
+
 def sync_all(start_ts, end_ts, provider=None):
     """Sync all active provider links (optionally filtered to one provider)."""
     links = providers.list_active_links(provider=provider)
@@ -92,6 +108,7 @@ def sync_all(start_ts, end_ts, provider=None):
     for link in links:
         results.append(sync_link(link, start_ts, end_ts))
         time.sleep(0.2)  # gentle pacing between provider calls
+    enforce_retention()
     return results
 
 

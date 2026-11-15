@@ -273,8 +273,8 @@ def strava_callback(
         athlete_id = providers.create_athlete({
             "firstname": athlete.get("firstname"),
             "lastname": athlete.get("lastname"),
-            "email": athlete.get("email"),
-            "timezone": athlete.get("timezone"),
+            # Only name + sex are kept from Strava (sex feeds the ranking
+            # categories in the dashboard). No email/timezone/location/photo.
             "sex": athlete.get("sex"),
         }, source="strava")
 
@@ -573,11 +573,17 @@ async def strava_webhook_event(request: Request):
         athlete_id = object_id or owner_id
 
         try:
-            updated_rows = providers.revoke_provider("strava", athlete_id)
+            # Strava API Policy 7.4: when a user revokes access we must delete
+            # their Strava data (and derived personal data) - not just stop
+            # syncing. Removes activities, monthly totals, the provider link and
+            # tokens, stored webhook events, and the athlete row if nothing else
+            # is linked to it.
+            purged = providers.purge_provider_data("strava", athlete_id)
 
             print(
-                f"ATHLETE REVOKED: strava_user_id={athlete_id}, "
-                f"updated_rows={updated_rows}"
+                f"ATHLETE REVOKED+PURGED: strava_user_id={athlete_id}, "
+                f"activities={purged['activities']}, totals={purged['monthly_totals']}, "
+                f"athlete_deleted={purged['athlete_deleted']}"
             )
 
         except Exception as e:

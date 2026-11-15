@@ -180,6 +180,90 @@ def revoke_provider(provider: str, provider_user_id: str) -> int:
     return len(res.data or [])
 
 
+def _count(query) -> int:
+    return query.execute().count or 0
+
+
+def purge_provider_data(provider: str, provider_user_id, dry_run: bool = False) -> Dict[str, Any]:
+    """
+    Permanently delete everything we hold for ONE provider account
+    (Strava API Policy 2.5 / 7.4: deletion on revocation or on request).
+
+    Removes, for the athlete linked to (provider, provider_user_id):
+      - their activities from that provider
+      - their monthly totals from that provider
+      - the provider link itself (tokens included)
+      - for Strava: stored webhook events about that Strava user
+      - the athlete row too, IF no other provider link remains for them
+        (the activities FK has no cascade, so activities are deleted first)
+
+    dry_run=True only counts what WOULD be deleted. Returns a summary dict.
+    Safe to call twice: the second call finds nothing and deletes nothing.
+    """
+    uid = str(provider_user_id)
+    link = find_provider_link(provider, uid)
+    out: Dict[str, Any] = {
+        "provider": provider, "provider_user_id": uid, "dry_run": dry_run,
+        "link_found": bool(link), "activities": 0, "monthly_totals": 0,
+        "webhook_events": 0, "athlete_deleted": False,
+    }
+
+    if provider == "strava":
+        events = supabase.table("webhook_events").select("*", count="exact").filter(
+            "payload->>owner_id", "eq", uid).limit(0)
+        out["webhook_events"] = _count(events)
+        if not dry_run and out["webhook_events"]:
+            supabase.table("webhook_events").delete().filter(
+                "payload->>owner_id", "eq", uid).execute()
+
+    if not link:
+        return out
+
+    athlete_id = link["athlete_id"]
+    out["activities"] = _count(
+        supabase.table("activities").select("*", count="exact")
+        .eq("athlete_id", athlete_id).eq("source", provider).limit(0))
+    out["monthly_totals"] = _count(
+        supabase.table("athlete_monthly_totals").select("*", count="exact")
+        .eq("athlete_id", athlete_id).eq("source", provider).limit(0))
+
+    other_links = [
+        l for l in (supabase.table("athlete_providers").select("id")
+                    .eq("athlete_id", athlete_id).execute().data or [])
+        if l["id"] != link["id"]
+    ]
+    out["athlete_deleted"] = not other_links
+
+    if dry_run:
+        return out
+
+    supabase.table("activities").delete().eq("athlete_id", athlete_id).eq("source", provider).execute()
+    supabase.table("athlete_monthly_totals").delete().eq("athlete_id", athlete_id).eq("source", provider).execute()
+    supabase.table("athlete_providers").delete().eq("id", link["id"]).execute()
+    if not other_links:
+        # No provider left for this person: remove any remaining rows that point
+        # at the athlete (FK without cascade), then the athlete itself.
+        supabase.table("activities").delete().eq("athlete_id", athlete_id).execute()
+        supabase.table("athletes").delete().eq("athlete_id", athlete_id).execute()
+    return out
+
+
+def rollup_old_activities(source: str, keep_days: int = 7) -> Dict[str, int]:
+    """
+    Retention: fold activities older than `keep_days` (calendar days incl. today)
+    for `source` into athlete_monthly_totals and delete them, atomically, via the
+    SQL function created in migration 009. Service-role only. Idempotent.
+    """
+    res = supabase.rpc(
+        "rollup_old_activities", {"p_source": source, "p_keep_days": keep_days}
+    ).execute()
+    row = (res.data or [{}])[0] if isinstance(res.data, list) else (res.data or {})
+    return {
+        "activities_deleted": int(row.get("activities_deleted", 0) or 0),
+        "totals_rows_touched": int(row.get("totals_rows_touched", 0) or 0),
+    }
+
+
 def list_active_links(provider: Optional[str] = None) -> List[Dict[str, Any]]:
     """
     Return active athlete_providers rows to sync. Optionally filter by provider.

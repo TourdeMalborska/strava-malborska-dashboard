@@ -44,10 +44,16 @@ TEXT = {
              "dopiero po Twojej autoryzacji, regularnie (obecnie co godzinę). "
              "Pobieramy wyłącznie dane z Twojego konta."),
             ("Do czego służą i kto je widzi:",
-             "do wyliczenia klubowego rankingu kilometrów. Ranking widzą pozostali uczestnicy: "
-             "Twoje imię i nazwisko oraz miesięczne sumy (liczba aktywności, dystans, czas). "
+             "do wyliczenia klubowego rankingu kilometrów. Ranking (Twoje imię i nazwisko "
+             "oraz miesięczne sumy: liczba aktywności, dystans, czas) nie jest publiczny — "
+             "widzą go wyłącznie wskazani administratorzy rankingu (organizatorzy). "
              "Nie sprzedajemy ani nie przekazujemy danych podmiotom trzecim, nie używamy ich "
              "do reklam ani do trenowania modeli AI."),
+            ("Jak długo je przechowujemy:",
+             "ze Stravy: szczegóły aktywności tylko przez 7 dni, potem zostają wyłącznie "
+             "miesięczne sumy (liczba aktywności, dystans i czas jazdy rowerem) oraz Twoje imię, "
+             "nazwisko i identyfikator. Pozostałe dane — do czasu wycofania zgody lub "
+             "prośby o usunięcie. Po cofnięciu dostępu w Stravie usuwamy Twoje dane ze Stravy."),
             ("Jak wycofać zgodę:",
              "w każdej chwili — cofnij dostęp w ustawieniach swojego dostawcy "
              "(Strava: Settings → My Apps → Revoke Access) lub napisz do nas. "
@@ -60,7 +66,7 @@ TEXT = {
         "support": "Wsparcie i prywatność",
         "check": ("Mam ukończone 18 lat. Zapoznałem(-am) się z powyższym i wyrażam zgodę na "
                   "przetwarzanie moich danych w opisany sposób, w tym na pokazywanie mojego "
-                  "imienia i nazwiska oraz miesięcznych sum innym uczestnikom rankingu."),
+                  "imienia i nazwiska oraz miesięcznych sum administratorom rankingu."),
         "connect": "Połącz z",
         "soon": "Wkrótce",
         "footer": "ranking klubowy",
@@ -83,10 +89,16 @@ TEXT = {
              "COROS, Wahoo), only after you authorize it, on a regular schedule (currently "
              "hourly). We only read data from your own account."),
             ("What it is used for and who sees it:",
-             "to calculate the club's kilometre ranking. The other participants can see the "
-             "ranking: your name and monthly totals (number of activities, distance, time). "
+             "to calculate the club's kilometre ranking. The ranking (your name and monthly "
+             "totals: number of activities, distance, time) is not public — only the named "
+             "ranking administrators (the organizers) can see it. "
              "We do not sell or share your data with third parties, and do not use it for "
              "advertising or to train AI models."),
+            ("How long we keep it:",
+             "from Strava: activity details for 7 days only, after which only monthly totals "
+             "(number of activities, cycling distance and time) plus your name and ID remain. "
+             "Other data: until you withdraw consent or ask for deletion. "
+             "If you revoke access in Strava, we delete your Strava data."),
             ("How to withdraw consent:",
              "at any time — revoke access in your provider's settings "
              "(Strava: Settings → My Apps → Revoke Access) or write to us. "
@@ -99,7 +111,7 @@ TEXT = {
         "support": "Support & privacy",
         "check": ("I am at least 18 years old. I have read the above and consent to my data "
                   "being processed as described, including showing my name and monthly totals "
-                  "to the other participants of the ranking."),
+                  "to the ranking administrators."),
         "connect": "Connect with",
         "soon": "Soon",
         "footer": "club ranking",
@@ -108,7 +120,18 @@ TEXT = {
 }
 
 
-def _button(label, color, path, status, t):
+def _button(label, color, path, status, t, slug=""):
+    if status == "live" and path and slug == "strava":
+        # Official "Connect with Strava" button, used UNMODIFIED as required by
+        # Strava's Brand Guidelines (no recolouring, resizing artefacts, filters
+        # or animation). Height 48px = the @1x size Strava specifies.
+        from strava_button import STRAVA_BUTTON_DATA_URI, STRAVA_BUTTON_HEIGHT_PX
+        return (
+            f'<button class="btn-strava" type="submit" formaction="{path}" '
+            f'aria-label="Connect with Strava">'
+            f'<img src="{STRAVA_BUTTON_DATA_URI}" alt="Connect with Strava" '
+            f'height="{STRAVA_BUTTON_HEIGHT_PX}"></button>'
+        )
     if status == "live" and path:
         return (
             f'<button class="btn" type="submit" formaction="{path}" style="--brand:{color}">'
@@ -129,7 +152,7 @@ def render_connect_page(lang: str = "pl", need_consent: bool = False) -> str:
     other_label, other_href = t["other_lang"]
 
     buttons = "\n        ".join(
-        _button(l, c, p, s, t) for (l, _slug, p, c, s) in PROVIDERS
+        _button(l, c, p, s, t, slug) for (l, slug, p, c, s) in PROVIDERS
     )
     items = "\n".join(
         f"<li><strong>{b}</strong> {txt}</li>" for (b, txt) in t["items"]
@@ -197,6 +220,10 @@ def render_connect_page(lang: str = "pl", need_consent: bool = False) -> str:
       -webkit-tap-highlight-color: transparent;
     }
     button.btn { appearance: none; -webkit-appearance: none; cursor: pointer; text-align: left; }
+    /* Official Strava button: leave the artwork untouched (no filter/hover effects). */
+    .btn-strava { appearance: none; -webkit-appearance: none; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; display: block; line-height: 0; width: fit-content; -webkit-tap-highlight-color: transparent; }
+    .btn-strava img { display: block; height: 48px; width: auto; }
+    .btn-strava:focus-visible { outline: 3px solid #212121; outline-offset: 3px; border-radius: 6px; }
     .btn:active { transform: scale(0.985); }
     .btn:hover { filter: brightness(1.08); }
     .btn-arrow { font-size: 1.15rem; opacity: 0.9; }

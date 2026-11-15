@@ -59,8 +59,10 @@ def _sections(lang: str, email: str):
              "Authorized Apps.</li>"
              "<li><strong>COROS:</strong> write to us and we will disconnect your account.</li>"
              "</ul>"
-             "<p>After access is revoked we stop collecting data from that account, and delete "
-             "the data already stored within 30 days.</p>"),
+             "<p>After access is revoked we stop collecting data from that account. For "
+             "Strava your data is deleted automatically when Strava notifies us of the "
+             "revocation (normally within minutes); for other providers it is deleted within "
+             "30 days.</p>"),
             ("deletion", "Deleting your data / getting a copy",
              "<p>Write to the contact address with the subject “Delete my data” (or “Copy of my "
              "data”) and say which account it concerns. We will delete your data within 30 days "
@@ -75,14 +77,19 @@ def _sections(lang: str, email: str):
              "<li><strong>Technical:</strong> the link between your account and the app, access "
              "tokens needed to fetch your data, and the date you gave consent.</li>"
              "</ul>"
-             "<p><strong>Who sees it:</strong> other ranking participants see your name and "
-             "monthly totals (number of activities, distance, time). We do not sell or share "
+             "<p><strong>Who sees it:</strong> the ranking (your name and monthly totals: "
+             "number of activities, distance, time) is not public. Only the named ranking "
+             "administrators can see it. We do not sell or share "
              "your data with third parties and do not use it for advertising, profiling or "
              "training AI models.</p>"
              "<p><strong>Processors:</strong> Supabase (database), Vercel (application hosting), "
              "Google Looker Studio (ranking display), Amazon Web Services S3 (database "
              "backups).</p>"
-             "<p><strong>How long:</strong> until you withdraw consent or ask for deletion.</p>"),
+             "<p><strong>How long:</strong> <em>Strava:</em> activity details for 7 days only; "
+             "after that only monthly totals (number of activities, cycling distance and "
+             "time) plus your name and Strava ID remain, until you revoke access or ask for "
+             "deletion. <em>Other providers:</em> until you withdraw consent or ask for "
+             "deletion.</p>"),
             ("rights", "Your rights",
              "<p>You can ask for access to your data, correction, deletion, restriction, "
              "objection and portability, and withdraw your consent at any time (this does not "
@@ -90,7 +97,8 @@ def _sections(lang: str, email: str):
              f'Poland the President of the Personal Data Protection Office '
              f'(<a href="{UODO_URL}">uodo.gov.pl</a>).</p>'),
             ("strava", "Strava data",
-             "<p>Data from Strava is used only for the club ranking. Strava may collect data "
+             "<p>Data from Strava is used only for the club ranking. Strava activity details "
+             "are kept for at most 7 days. Strava may collect data "
              "about how this app uses its API (“Usage Data”) as described in the "
              f'<a href="{STRAVA_PRIVACY_URL}">Strava Privacy Policy</a>. This app is not '
              "affiliated with, endorsed or sponsored by Strava.</p>"),
@@ -108,8 +116,10 @@ def _sections(lang: str, email: str):
          "Authorized Apps.</li>"
          "<li><strong>COROS:</strong> napisz do nas — odłączymy Twoje konto.</li>"
          "</ul>"
-         "<p>Po cofnięciu dostępu przestajemy pobierać dane z tego konta, a zapisane już dane "
-         "usuwamy w ciągu 30 dni.</p>"),
+         "<p>Po cofnięciu dostępu przestajemy pobierać dane z tego konta. W przypadku Strava "
+         "Twoje dane są usuwane automatycznie po otrzymaniu od Strava powiadomienia o "
+         "cofnięciu dostępu (zwykle w ciągu kilku minut); u pozostałych dostawców — w ciągu "
+         "30 dni.</p>"),
         ("deletion", "Usunięcie danych / kopia danych",
          "<p>Napisz na adres kontaktowy z tematem „Usuń moje dane” (lub „Kopia moich "
          "danych”) i wskaż, którego konta dotyczy prośba. Usuniemy Twoje dane w ciągu 30 dni "
@@ -124,21 +134,27 @@ def _sections(lang: str, email: str):
          "<li><strong>Techniczne:</strong> powiązanie Twojego konta z aplikacją, tokeny "
          "dostępu potrzebne do pobierania danych oraz data wyrażenia zgody.</li>"
          "</ul>"
-         "<p><strong>Kto widzi dane:</strong> pozostali uczestnicy rankingu widzą Twoje imię i "
-         "nazwisko oraz miesięczne sumy (liczba aktywności, dystans, czas). Nie sprzedajemy "
+         "<p><strong>Kto widzi dane:</strong> ranking (Twoje imię i nazwisko oraz miesięczne "
+         "sumy: liczba aktywności, dystans, czas) nie jest publiczny. Widzą go wyłącznie "
+         "wskazani administratorzy rankingu. Nie sprzedajemy "
          "ani nie udostępniamy danych podmiotom trzecim i nie używamy ich do reklam, "
          "profilowania ani do trenowania modeli AI.</p>"
          "<p><strong>Podmioty przetwarzające:</strong> Supabase (baza danych), Vercel "
          "(hosting aplikacji), Google Looker Studio (prezentacja rankingu), Amazon Web "
          "Services S3 (kopie zapasowe bazy).</p>"
-         "<p><strong>Jak długo:</strong> do czasu wycofania zgody lub prośby o usunięcie.</p>"),
+         "<p><strong>Jak długo:</strong> <em>Strava:</em> szczegóły aktywności tylko przez 7 "
+         "dni; potem zostają wyłącznie miesięczne sumy (liczba aktywności, dystans i czas "
+         "jazdy rowerem) oraz Twoje imię, nazwisko i identyfikator Strava — do czasu "
+         "cofnięcia dostępu lub prośby o usunięcie. <em>Pozostali dostawcy:</em> do czasu "
+         "wycofania zgody lub prośby o usunięcie.</p>"),
         ("rights", "Twoje prawa",
          "<p>Możesz żądać dostępu do danych, ich sprostowania, usunięcia, ograniczenia "
          "przetwarzania, wnieść sprzeciw, przenieść dane oraz w każdej chwili wycofać zgodę "
          "(bez wpływu na zgodność z prawem wcześniejszego przetwarzania). Możesz złożyć "
          f'skargę do Prezesa Urzędu Ochrony Danych Osobowych (<a href="{UODO_URL}">uodo.gov.pl</a>).</p>'),
         ("strava", "Dane ze Strava",
-         "<p>Dane ze Strava wykorzystujemy wyłącznie do rankingu klubowego. Strava może "
+         "<p>Dane ze Strava wykorzystujemy wyłącznie do rankingu klubowego. Szczegóły "
+         "aktywności ze Strava przechowujemy najwyżej 7 dni. Strava może "
          "zbierać dane o korzystaniu z jej API przez aplikację („Usage Data”), zgodnie z "
          f'<a href="{STRAVA_PRIVACY_URL}">Polityką prywatności Strava</a>. Aplikacja nie jest '
          "powiązana ze Stravą, ani przez nią popierana lub sponsorowana.</p>"),

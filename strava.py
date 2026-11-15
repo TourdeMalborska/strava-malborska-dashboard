@@ -133,7 +133,9 @@ def normalize_activity(activity: Dict[str, Any]) -> Dict[str, Any]:
         "sport_type": activity.get("sport_type"),
         "activity_name": activity.get("name"),
         "manual": activity.get("manual"),
-        "raw": activity,
+        # Data minimisation (Strava API Policy 5.7/6.2): do NOT keep Strava's raw
+        # payload (it contains start/end coordinates and a route polyline).
+        "raw": None,
     }
 
 
