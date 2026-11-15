@@ -66,6 +66,19 @@ def create_athlete(profile: Dict[str, Any], source: str) -> str:
     return result.data[0]["athlete_id"]
 
 
+def record_consent(athlete_id: str) -> None:
+    """
+    Stamp the moment the athlete accepted the current consent text on the
+    connect page. Called from every OAuth callback, including reconnects, so
+    athletes who joined before the consent step existed are re-recorded when
+    they reconnect.
+    """
+    supabase.table("athletes").update({
+        "consent_date": _now_iso(),
+        "updated_at": _now_iso(),
+    }).eq("athlete_id", athlete_id).execute()
+
+
 # -------------------------
 # Provider links + tokens
 # -------------------------

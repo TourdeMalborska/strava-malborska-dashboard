@@ -37,11 +37,31 @@ class StatusResponse(BaseModel):
 	status: str
 
 @app.get("/", response_class=HTMLResponse)
-def root():
-    # Athlete-facing connect page (mobile-first). Monitoring/health checks
-    # should target /health (JSON) or /status, not /.
+def root(lang: str = "pl", need_consent: str = None):
+    # Athlete-facing connect page (mobile-first) with the consent step.
+    # Monitoring/health checks should target /health (JSON) or /status, not /.
     from connect_page import render_connect_page
-    return render_connect_page()
+    return render_connect_page(lang=lang, need_consent=bool(need_consent))
+
+
+@app.get("/support", response_class=HTMLResponse)
+def support(lang: str = "pl"):
+    # Support & privacy page (Strava API Policy 2.1/2.3). Contact address comes
+    # from the SUPPORT_EMAIL env var; falls back to the school website if unset.
+    from legal_pages import render_support_page
+    return render_support_page(lang=lang, contact_email=os.getenv("SUPPORT_EMAIL"))
+
+
+def _consent_required(consent):
+    """
+    The connect page sends consent=1 only when the user ticked the required
+    consent checkbox. Auth routes refuse to start an OAuth flow without it, so
+    no provider data is accessed before the user has seen and accepted the
+    disclosures (Strava API Policy 2.1 / 7.2).
+    """
+    if consent != "1":
+        return RedirectResponse(url="/?need_consent=1", status_code=302)
+    return None
 
 
 @app.get("/status", response_model=StatusResponse)
@@ -60,7 +80,10 @@ def health():
         "status": "healthy"
     }
 @app.get("/auth/strava")
-def auth_strava():
+def auth_strava(consent: str = None):
+    blocked = _consent_required(consent)
+    if blocked:
+        return blocked
 
     url = (
         "https://www.strava.com/oauth/authorize"
@@ -78,12 +101,16 @@ import coros as coros_provider
 
 
 @app.get("/auth/coros")
-def auth_coros():
+def auth_coros(consent: str = None):
     """
     Start the COROS OAuth connect flow (model B: COROS is an independent
     provider). Generates PKCE + state, stores them in oauth_states, and
     redirects the user to COROS to authorize.
     """
+    blocked = _consent_required(consent)
+    if blocked:
+        return blocked
+
     pkce = providers.generate_pkce()
     state = providers.save_oauth_state(
         provider="coros",
@@ -134,6 +161,7 @@ def coros_callback(code: str = None, state: str = None, error: str = None):
         profile = coros_provider.fetch_profile(token_data.get("access_token"))
         athlete_id = providers.create_athlete(profile, source="coros")
 
+    providers.record_consent(athlete_id)
     providers.link_provider(
         athlete_id=athlete_id,
         provider="coros",
@@ -151,8 +179,12 @@ import wahoo as wahoo_provider
 
 
 @app.get("/auth/wahoo")
-def auth_wahoo():
+def auth_wahoo(consent: str = None):
     """Start the Wahoo OAuth connect flow (confidential client, no PKCE)."""
+    blocked = _consent_required(consent)
+    if blocked:
+        return blocked
+
     state = providers.save_oauth_state(provider="wahoo", code_verifier=None)
     return RedirectResponse(url=wahoo_provider.build_authorize_url(state=state))
 
@@ -188,6 +220,7 @@ def wahoo_callback(code: str = None, state: str = None, error: str = None):
         profile = wahoo_provider.fetch_profile(access_token)
         athlete_id = providers.create_athlete(profile, source="wahoo")
 
+    providers.record_consent(athlete_id)
     providers.link_provider(
         athlete_id=athlete_id,
         provider="wahoo",
@@ -245,6 +278,7 @@ def strava_callback(
             "sex": athlete.get("sex"),
         }, source="strava")
 
+    providers.record_consent(athlete_id)
     providers.link_provider(
         athlete_id=athlete_id,
         provider="strava",
