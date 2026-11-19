@@ -1,0 +1,20 @@
+{
+  "Rules": [
+    {
+      "ID": "expire-supabase-backups-35d",
+      "Status": "Enabled",
+      "Filter": {
+        "Prefix": "REPLACE_WITH_S3_BACKUP_PREFIX/"
+      },
+      "Expiration": {
+        "Days": 35
+      },
+      "NoncurrentVersionExpiration": {
+        "NoncurrentDays": 1
+      },
+      "AbortIncompleteMultipartUpload": {
+        "DaysAfterInitiation": 1
+      }
+    }
+  ]
+}

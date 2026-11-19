@@ -276,3 +276,37 @@ matters for data trust. Support varies by provider:
 
 `activities.manual` is nullable: True = manual, False = device-recorded,
 None = unknown (provider didn't say).
+
+## Backup retention (35 days)
+
+Backups are written by `scripts/backup_supabase.sh` to
+`s3://<S3_BUCKET>/<S3_BACKUP_PREFIX>/malborska_<timestamp>.tar.gz` (+ `.sha256`).
+They are expired by an S3 lifecycle rule, not by the workflow: the backup IAM
+user only needs `s3:PutObject`, and lifecycle runs on AWS's side even if
+GitHub Actions stops.
+
+Rule: `scripts/s3_backup_lifecycle.json`
+- objects under the backup prefix expire **35 days** after upload
+- old versions (if bucket versioning is on) are removed 1 day after they
+  become noncurrent, so "expired" really means deleted
+- incomplete multipart uploads are cleaned up after 1 day
+
+Apply once (from a machine with AWS admin credentials, not the backup user):
+
+```
+# 1. replace REPLACE_WITH_S3_BACKUP_PREFIX with the value of the
+#    S3_BACKUP_PREFIX GitHub variable (no leading or trailing slash)
+aws s3api put-bucket-lifecycle-configuration \
+  --bucket <S3_BUCKET> \
+  --lifecycle-configuration file://scripts/s3_backup_lifecycle.json
+
+# 2. verify
+aws s3api get-bucket-lifecycle-configuration --bucket <S3_BUCKET>
+```
+
+Note: `put-bucket-lifecycle-configuration` REPLACES the whole lifecycle
+configuration of the bucket. If the bucket already has rules, merge them into
+the JSON first.
+
+S3 evaluates lifecycle rules once a day, so an object is deleted shortly after
+day 35, not at the exact minute.
