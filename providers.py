@@ -266,11 +266,16 @@ def rollup_old_activities(source: str, keep_days: int = 7) -> Dict[str, int]:
 
 def list_active_links(provider: Optional[str] = None) -> List[Dict[str, Any]]:
     """
-    Return active athlete_providers rows to sync. Optionally filter by provider.
+    Return athlete_providers rows to sync. Optionally filter by provider.
     This replaces the old 'select athletes where active=true' — syncability is a
     property of the provider link, not the person.
+
+    Links in status 'error' are INCLUDED so a transient failure (e.g. a 504 from
+    the provider) is retried on the next run instead of disabling the athlete
+    permanently; a successful sync sets the link back to 'active'. Only
+    'revoked' links are skipped.
     """
-    query = supabase.table("athlete_providers").select("*").eq("status", "active")
+    query = supabase.table("athlete_providers").select("*").in_("status", ["active", "error"])
     if provider:
         query = query.eq("provider", provider)
     return query.execute().data or []
