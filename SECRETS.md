@@ -158,9 +158,9 @@ Infisical EU · tourdemalborska · prod
 ```
 
 - **Local dev** and **Vercel** consume `prod/app`.
-- **GitHub Actions** consumes `prod/backup`.
-- The Vercel and GitHub pushes are configured as native integrations in the
-  Infisical dashboard (not yet wired — see TODO above).
+- **GitHub Actions** uses its own secrets (see the backup section above).
+- The Infisical → Vercel push is a native integration configured in the
+  Infisical dashboard.
 
 ## Local development
 
