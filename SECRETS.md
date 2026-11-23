@@ -64,33 +64,34 @@ which Infisical must NOT manage — see the section below.)
 | `STRAVA_CLIENT_ID` | `config.py`, `api/index.py`, `strava.py` | Secret | ✅ seeded | ✅ | Strava OAuth app ID. |
 | `STRAVA_CLIENT_SECRET` | `config.py`, `api/index.py`, `strava.py` | Secret | ✅ seeded | ✅ | Strava OAuth app secret. |
 | `STRAVA_VERIFY_TOKEN` | `config.py`, `api/index.py` | Secret | ✅ seeded | ✅ | Strava webhook verification token. |
-| `STRAVA_REDIRECT_URI` | `config.py` | Config | ⬜ TODO | ✅ | Optional; defaults to the Vercel prod callback. |
-| `CRON_SECRET` | `api/index.py` | Secret | ⬜ TODO | ✅ | Bearer token guarding `/sync/daily`. |
-| `GITHUB_BACKUP_TOKEN` | `api/index.py` | Secret | ⬜ TODO | ✅ | PAT to dispatch the backup workflow. |
-| `GARMIN_API_KEY` | `garmin.py` | Secret | ⬜ TODO | ✅ | Garmin Personal API key. |
+| `STRAVA_REDIRECT_URI` | `config.py` | Config | ✅ added | ✅ | Optional; defaults to the Vercel prod callback. |
+| `CRON_SECRET` | `api/index.py` | Secret | ✅ added | ✅ | Bearer token guarding `/sync/daily`. |
+| `GITHUB_BACKUP_TOKEN` | `api/index.py` | Secret | ✅ added | ✅ | PAT to dispatch the backup workflow. |
+| `GARMIN_API_KEY` | `garmin.py` | Secret | ✅ added | ✅ | Garmin Personal API key. |
 | `GARMIN_HOST` | `garmin.py` | Config | ⬜ optional | — | Defaults to `https://personal.connectapi.garmin.com`. |
-| `COROS_CLIENT_ID` | `coros.py` | Config | ⬜ TODO | ✅ | Public OAuth client ID (PKCE, no client secret). |
-| `COROS_REDIRECT_URI` | `coros.py` | Config | ⬜ optional | — (default used) | Optional; defaults to the prod callback. Must match COROS registration. |
+| `COROS_CLIENT_ID` | `coros.py` | Config | ✅ added | ✅ | Public OAuth client ID (PKCE, no client secret). |
+| `COROS_REDIRECT_URI` | `coros.py` | Config | ✅ added (not in Vercel) | — (default used) | Optional; defaults to the prod callback. Must match COROS registration. |
 | `COROS_TEST_SECRET` | `api/index.py` | Secret | ⬜ optional | ❌ missing | Guards `/test/coros/connection`. Intentionally unset: endpoint fails closed (503). PoC; candidate for removal. |
-| `COROS_MCP_URL` | `coros.py`, `coros_mcp.py` | Config | ⬜ optional | — (default used) | Optional; defaults to the EU COROS MCP URL. |
-| `WAHOO_CLIENT_ID` | `wahoo.py` | Secret | ⬜ TODO | ✅ | Wahoo OAuth app ID. |
-| `WAHOO_CLIENT_SECRET` | `wahoo.py` | Secret | ⬜ TODO | ✅ | Wahoo OAuth app secret. |
+| `COROS_MCP_URL` | `coros.py`, `coros_mcp.py` | Config | ✅ added (not in Vercel) | — (default used) | Optional; defaults to the EU COROS MCP URL. |
+| `WAHOO_CLIENT_ID` | `wahoo.py` | Secret | ✅ added | ✅ | Wahoo OAuth app ID. |
+| `WAHOO_CLIENT_SECRET` | `wahoo.py` | Secret | ✅ added | ✅ | Wahoo OAuth app secret. |
 | `WAHOO_REDIRECT_URI` / `WAHOO_HOST` | `wahoo.py` | Config | ⬜ optional | — | Default to the prod callback / `https://api.wahooligan.com`. |
-| `HAMMERHEAD_CLIENT_ID` | `hammerhead.py` | Secret | ⬜ TODO | ✅ | Hammerhead OAuth app ID. |
-| `HAMMERHEAD_CLIENT_SECRET` | `hammerhead.py` | Secret | ⬜ TODO | ✅ | Hammerhead OAuth app secret. |
+| `HAMMERHEAD_CLIENT_ID` | `hammerhead.py` | Secret | ✅ added | ✅ | Hammerhead OAuth app ID. |
+| `HAMMERHEAD_CLIENT_SECRET` | `hammerhead.py` | Secret | ✅ added | ✅ | Hammerhead OAuth app secret. |
 | `HAMMERHEAD_REDIRECT_URI` | `hammerhead.py` | Config | ⬜ optional | — | Defaults to the prod callback. |
-| `SUPPORT_EMAIL` | `api/index.py` | Config | ⬜ TODO | ❌ missing | Contact email on `/support`; falls back to the school website. |
+| `SUPPORT_EMAIL` | `api/index.py` | Config | ⬜ TODO | ✅ | Contact email on `/support`; falls back to the school website. |
 | `STRAVA_ACCESS_TOKEN` | `api/index.py` | Secret | ⬜ optional | ❌ missing | Test-only (`/activities`); not needed in normal operation. |
 
-> **⬜ TODO rows that exist in Vercel**: add them to Infisical `prod/app` so
-> Infisical is the complete source of truth, then let the Vercel integration
-> push them back.
->
-> **❌ missing rows**: `COROS_TEST_SECRET` / `COROS_MCP_URL` are read by the
-> code but are **not set in Vercel** — the COROS test endpoint cannot work in
-> production until they are added (to Infisical, then pushed). `STRAVA_ACCESS_TOKEN`
-> is test-only and can be skipped.
+**Reserved / future keys in Infisical `prod/app`** (no code reads them yet):
+`POLAR_CLIENT_ID`, `POLAR_CLIENT_SECRET` (Polar integration).
 
+**Pending:** `SUPPORT_EMAIL` still needs adding to Infisical (it is set in Vercel).
+
+**Not yet synced:** the Infisical → Vercel sync is OFF by decision. Before enabling
+it: (1) exclude `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, which in Vercel are
+owned by the Supabase integration; (2) `COROS_MCP_URL` and `COROS_REDIRECT_URI`
+exist in Infisical but not in Vercel, so enabling the sync would push them. Make
+sure their values equal the code defaults first.
 ## Vercel–Supabase integration vars (NOT managed by Infisical)
 
 When Supabase is connected to Vercel, the integration automatically injects the
