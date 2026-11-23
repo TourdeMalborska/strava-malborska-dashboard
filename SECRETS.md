@@ -79,13 +79,11 @@ which Infisical must NOT manage — see the section below.)
 | `HAMMERHEAD_CLIENT_ID` | `hammerhead.py` | Secret | ✅ added | ✅ | Hammerhead OAuth app ID. |
 | `HAMMERHEAD_CLIENT_SECRET` | `hammerhead.py` | Secret | ✅ added | ✅ | Hammerhead OAuth app secret. |
 | `HAMMERHEAD_REDIRECT_URI` | `hammerhead.py` | Config | ⬜ optional | — | Defaults to the prod callback. |
-| `SUPPORT_EMAIL` | `api/index.py` | Config | ⬜ TODO | ✅ | Contact email on `/support`; falls back to the school website. |
+| `SUPPORT_EMAIL` | `api/index.py` | Config | ✅ added | ✅ | Contact email on `/support`; falls back to the school website. |
 | `STRAVA_ACCESS_TOKEN` | `api/index.py` | Secret | ⬜ optional | ❌ missing | Test-only (`/activities`); not needed in normal operation. |
 
 **Reserved / future keys in Infisical `prod/app`** (no code reads them yet):
 `POLAR_CLIENT_ID`, `POLAR_CLIENT_SECRET` (Polar integration).
-
-**Pending:** `SUPPORT_EMAIL` still needs adding to Infisical (it is set in Vercel).
 
 **Not yet synced:** the Infisical → Vercel sync is OFF by decision. Before enabling
 it: (1) exclude `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, which in Vercel are
