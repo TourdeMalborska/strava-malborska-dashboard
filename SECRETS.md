@@ -1,4 +1,4 @@
-# Secrets inventory — Tour de Malborska
+﻿# Secrets inventory — Tour de Malborska
 
 This document is the single source of truth for **which** secrets the project
 uses, **where** they are consumed, and **how** they map to the Infisical
@@ -69,17 +69,17 @@ which Infisical must NOT manage — see the section below.)
 | `GITHUB_BACKUP_TOKEN` | `api/index.py` | Secret | ⬜ TODO | ✅ | PAT to dispatch the backup workflow. |
 | `GARMIN_API_KEY` | `garmin.py` | Secret | ⬜ TODO | ✅ | Garmin Personal API key. |
 | `GARMIN_HOST` | `garmin.py` | Config | ⬜ optional | — | Defaults to `https://personal.connectapi.garmin.com`. |
-| `COROS_CLIENT_ID` | `coros.py` | Config | ⬜ TODO | ❓ verify | Public OAuth client ID (PKCE, no client secret). |
-| `COROS_REDIRECT_URI` | `coros.py` | Config | ⬜ TODO | ❓ verify | Optional; defaults to the prod callback. Must match COROS registration. |
-| `COROS_TEST_SECRET` | `api/index.py` | Secret | ⬜ TODO | ❌ **missing** | Guards `/test/coros/connection`. Endpoint 503s in prod without it. |
-| `COROS_MCP_URL` | `coros.py`, `coros_mcp.py` | Config | ⬜ TODO | ❌ missing | Optional; defaults to the EU COROS MCP URL. |
-| `WAHOO_CLIENT_ID` | `wahoo.py` | Secret | ⬜ TODO | ❓ verify | Wahoo OAuth app ID. |
-| `WAHOO_CLIENT_SECRET` | `wahoo.py` | Secret | ⬜ TODO | ❓ verify | Wahoo OAuth app secret. |
+| `COROS_CLIENT_ID` | `coros.py` | Config | ⬜ TODO | ✅ | Public OAuth client ID (PKCE, no client secret). |
+| `COROS_REDIRECT_URI` | `coros.py` | Config | ⬜ optional | — (default used) | Optional; defaults to the prod callback. Must match COROS registration. |
+| `COROS_TEST_SECRET` | `api/index.py` | Secret | ⬜ optional | ❌ missing | Guards `/test/coros/connection`. Intentionally unset: endpoint fails closed (503). PoC; candidate for removal. |
+| `COROS_MCP_URL` | `coros.py`, `coros_mcp.py` | Config | ⬜ optional | — (default used) | Optional; defaults to the EU COROS MCP URL. |
+| `WAHOO_CLIENT_ID` | `wahoo.py` | Secret | ⬜ TODO | ✅ | Wahoo OAuth app ID. |
+| `WAHOO_CLIENT_SECRET` | `wahoo.py` | Secret | ⬜ TODO | ✅ | Wahoo OAuth app secret. |
 | `WAHOO_REDIRECT_URI` / `WAHOO_HOST` | `wahoo.py` | Config | ⬜ optional | — | Default to the prod callback / `https://api.wahooligan.com`. |
-| `HAMMERHEAD_CLIENT_ID` | `hammerhead.py` | Secret | ⬜ TODO | ❓ verify | Hammerhead OAuth app ID. |
-| `HAMMERHEAD_CLIENT_SECRET` | `hammerhead.py` | Secret | ⬜ TODO | ❓ verify | Hammerhead OAuth app secret. |
+| `HAMMERHEAD_CLIENT_ID` | `hammerhead.py` | Secret | ⬜ TODO | ✅ | Hammerhead OAuth app ID. |
+| `HAMMERHEAD_CLIENT_SECRET` | `hammerhead.py` | Secret | ⬜ TODO | ✅ | Hammerhead OAuth app secret. |
 | `HAMMERHEAD_REDIRECT_URI` | `hammerhead.py` | Config | ⬜ optional | — | Defaults to the prod callback. |
-| `SUPPORT_EMAIL` | `api/index.py` | Config | ⬜ TODO | ❓ verify | Contact email on `/support`; falls back to the school website. |
+| `SUPPORT_EMAIL` | `api/index.py` | Config | ⬜ TODO | ❌ missing | Contact email on `/support`; falls back to the school website. |
 | `STRAVA_ACCESS_TOKEN` | `api/index.py` | Secret | ⬜ optional | ❌ missing | Test-only (`/activities`); not needed in normal operation. |
 
 > **⬜ TODO rows that exist in Vercel**: add them to Infisical `prod/app` so
