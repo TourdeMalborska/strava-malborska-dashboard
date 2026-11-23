@@ -40,7 +40,8 @@ TEXT = {
              "oraz dla każdej aktywności: datę, rodzaj sportu, dystans, czas ruchu, nazwę "
              "i informację, czy została wpisana ręcznie."),
             ("Jak je pobieramy:",
-             "automatycznie, przez oficjalne API wybranego dostawcy (np. Strava, COROS, Wahoo), "
+             "automatycznie, przez oficjalne API wybranego dostawcy (np. Strava, COROS, Wahoo, "
+             "Hammerhead Karoo), "
              "dopiero po Twojej autoryzacji, regularnie (obecnie co godzinę). "
              "Pobieramy wyłącznie dane z Twojego konta."),
             ("Do czego służą i kto je widzi:",
@@ -53,11 +54,13 @@ TEXT = {
              "ze Stravy: szczegóły aktywności tylko przez 7 dni, potem zostają wyłącznie "
              "miesięczne sumy (liczba aktywności, dystans i czas jazdy rowerem) oraz Twoje imię, "
              "nazwisko i identyfikator. Pozostałe dane — do czasu wycofania zgody lub "
-             "prośby o usunięcie. Po cofnięciu dostępu w Stravie usuwamy Twoje dane ze Stravy."),
+             "prośby o usunięcie."),
             ("Jak wycofać zgodę:",
-             "w każdej chwili — cofnij dostęp w ustawieniach swojego dostawcy "
-             "(Strava: Settings → My Apps → Revoke Access) lub napisz do nas. "
-             "Po cofnięciu dostępu przestajemy pobierać dane."),
+             "w każdej chwili — wejdź do aplikacji lub serwisu, w którym udzieliłeś(-aś) "
+             "Tour de Malborska dostępu do swoich danych, i cofnij ten dostęp w jego "
+             "ustawieniach połączonych aplikacji. Możesz też napisać do nas. Po cofnięciu "
+             "dostępu przestajemy pobierać dane. Dane ze Stravy usuwamy wtedy automatycznie; "
+             "dane od pozostałych dostawców usuniemy w ciągu 30 dni od Twojej prośby."),
             ("Jak zażądać usunięcia danych lub ich kopii:",
              "napisz na adres ze strony wsparcia. Usuniemy Twoje dane w ciągu 30 dni "
              "i potwierdzimy to wiadomością."),
@@ -86,7 +89,8 @@ TEXT = {
              "entered manually."),
             ("How we collect it:",
              "automatically, through the official API of the provider you choose (e.g. Strava, "
-             "COROS, Wahoo), only after you authorize it, on a regular schedule (currently "
+             "COROS, Wahoo, Hammerhead Karoo), only after you authorize it, on a regular "
+             "schedule (currently "
              "hourly). We only read data from your own account."),
             ("What it is used for and who sees it:",
              "to calculate the club's kilometre ranking. The ranking (your name and monthly "
@@ -97,12 +101,13 @@ TEXT = {
             ("How long we keep it:",
              "from Strava: activity details for 7 days only, after which only monthly totals "
              "(number of activities, cycling distance and time) plus your name and ID remain. "
-             "Other data: until you withdraw consent or ask for deletion. "
-             "If you revoke access in Strava, we delete your Strava data."),
+             "Other data: until you withdraw consent or ask for deletion."),
             ("How to withdraw consent:",
-             "at any time — revoke access in your provider's settings "
-             "(Strava: Settings → My Apps → Revoke Access) or write to us. "
-             "Once access is revoked we stop collecting data."),
+             "at any time — open the app or service where you authorized Tour de Malborska "
+             "to access your data, and revoke that access in its connected-apps settings. "
+             "You can also write to us. Once access is revoked we stop collecting data. "
+             "Strava data is then deleted automatically; data from other providers is "
+             "deleted within 30 days of your request."),
             ("How to request deletion or a copy of your data:",
              "write to the address on the support page. We will delete your data within "
              "30 days and confirm it by message."),

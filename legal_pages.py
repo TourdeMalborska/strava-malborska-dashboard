@@ -52,6 +52,9 @@ def _sections(lang: str, email: str):
              "<p>The data controller is the organizer of the Tour de Malborska ranking "
              "(contact above).</p>"),
             ("disconnect", "How to disconnect your account",
+             "<p>Open the app or service where you authorized Tour de Malborska to access "
+             "your data and revoke that access in its connected-apps settings, or write to "
+             "us. Where to find it for each provider:</p>"
              "<ul>"
              f'<li><strong>Strava:</strong> Settings → My Apps → Revoke Access '
              f'(<a href="{STRAVA_APPS_URL}">strava.com/settings/apps</a>).</li>'
@@ -64,8 +67,8 @@ def _sections(lang: str, email: str):
              "</ul>"
              "<p>After access is revoked we stop collecting data from that account. For "
              "Strava your data is deleted automatically when Strava notifies us of the "
-             "revocation (normally within minutes); for other providers it is deleted within "
-             "30 days.</p>"),
+             "revocation (normally within minutes). Other providers do not notify us, so "
+             "write to us and we will delete that data within 30 days of your request.</p>"),
             ("deletion", "Deleting your data / getting a copy",
              "<p>Write to the contact address with the subject “Delete my data” (or “Copy of my "
              "data”) and say which account it concerns. We will delete your data within 30 days "
@@ -112,6 +115,9 @@ def _sections(lang: str, email: str):
          "<p>Administratorem danych jest organizator rankingu Tour de Malborska "
          "(kontakt powyżej).</p>"),
         ("disconnect", "Jak odłączyć swoje konto",
+         "<p>Wejdź do aplikacji lub serwisu, w którym udzieliłeś(-aś) Tour de Malborska "
+         "dostępu do swoich danych, i cofnij ten dostęp w jego ustawieniach połączonych "
+         "aplikacji albo napisz do nas. Gdzie to znaleźć u poszczególnych dostawców:</p>"
          "<ul>"
          f'<li><strong>Strava:</strong> Settings → My Apps → Revoke Access '
          f'(<a href="{STRAVA_APPS_URL}">strava.com/settings/apps</a>).</li>'
@@ -124,8 +130,9 @@ def _sections(lang: str, email: str):
          "</ul>"
          "<p>Po cofnięciu dostępu przestajemy pobierać dane z tego konta. W przypadku Strava "
          "Twoje dane są usuwane automatycznie po otrzymaniu od Strava powiadomienia o "
-         "cofnięciu dostępu (zwykle w ciągu kilku minut); u pozostałych dostawców — w ciągu "
-         "30 dni.</p>"),
+         "cofnięciu dostępu (zwykle w ciągu kilku minut). Pozostali dostawcy nas o tym nie "
+         "powiadamiają — napisz do nas, a usuniemy te dane w ciągu 30 dni od Twojej "
+         "prośby.</p>"),
         ("deletion", "Usunięcie danych / kopia danych",
          "<p>Napisz na adres kontaktowy z tematem „Usuń moje dane” (lub „Kopia moich "
          "danych”) i wskaż, którego konta dotyczy prośba. Usuniemy Twoje dane w ciągu 30 dni "
