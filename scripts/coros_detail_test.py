@@ -22,11 +22,11 @@ Prerequisites
 
 Target activity (the manually-created COROS ride we're investigating):
   labelId = 481427340851708308   sportType = 200   (2026-10-31, 35.16 km)
-Override via CLI args:  python coros_detail_test.py <labelId> <sportType>
+Override via CLI args:  python scripts/coros_detail_test.py <labelId> <sportType>
 
 Usage
-  python coros_detail_test.py
-  python coros_detail_test.py 481427340851708308 200
+  python scripts/coros_detail_test.py
+  python scripts/coros_detail_test.py 481427340851708308 200
 """
 
 import os

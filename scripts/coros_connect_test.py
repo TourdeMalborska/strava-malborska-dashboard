@@ -30,7 +30,7 @@ How the redirect works
   quick, or temporarily note the code before the page finishes.)
 
 Usage
-  python coros_connect_test.py
+  python scripts/coros_connect_test.py
 """
 
 import os

@@ -51,7 +51,7 @@ the core of the architecture:
 ## `prod/app` — application runtime (synced to Vercel)
 
 Consumed by the FastAPI app (`api/index.py`, `config.py`, `strava.py`,
-`coros_mcp.py`). Also the source for local development via `infisical run`.
+`coros.py`, `coros_mcp.py`, `wahoo.py`, `hammerhead.py`, `garmin.py`). Also the source for local development via `infisical run`.
 
 These are the application's **own** secrets — Infisical owns them and pushes
 them into Vercel. (This is distinct from the Vercel–Supabase integration vars,
@@ -67,9 +67,19 @@ which Infisical must NOT manage — see the section below.)
 | `STRAVA_REDIRECT_URI` | `config.py` | Config | ⬜ TODO | ✅ | Optional; defaults to the Vercel prod callback. |
 | `CRON_SECRET` | `api/index.py` | Secret | ⬜ TODO | ✅ | Bearer token guarding `/sync/daily`. |
 | `GITHUB_BACKUP_TOKEN` | `api/index.py` | Secret | ⬜ TODO | ✅ | PAT to dispatch the backup workflow. |
-| `GARMIN_API_KEY` | (not in code yet) | Secret | ⬜ TODO | ✅ | Garmin provider groundwork; no code reference yet. |
+| `GARMIN_API_KEY` | `garmin.py` | Secret | ⬜ TODO | ✅ | Garmin Personal API key. |
+| `GARMIN_HOST` | `garmin.py` | Config | ⬜ optional | — | Defaults to `https://personal.connectapi.garmin.com`. |
+| `COROS_CLIENT_ID` | `coros.py` | Config | ⬜ TODO | ❓ verify | Public OAuth client ID (PKCE, no client secret). |
+| `COROS_REDIRECT_URI` | `coros.py` | Config | ⬜ TODO | ❓ verify | Optional; defaults to the prod callback. Must match COROS registration. |
 | `COROS_TEST_SECRET` | `api/index.py` | Secret | ⬜ TODO | ❌ **missing** | Guards `/test/coros/connection`. Endpoint 503s in prod without it. |
-| `COROS_MCP_URL` | `coros_mcp.py` | Config | ⬜ TODO | ❌ missing | Optional; defaults to the EU COROS MCP URL. |
+| `COROS_MCP_URL` | `coros.py`, `coros_mcp.py` | Config | ⬜ TODO | ❌ missing | Optional; defaults to the EU COROS MCP URL. |
+| `WAHOO_CLIENT_ID` | `wahoo.py` | Secret | ⬜ TODO | ❓ verify | Wahoo OAuth app ID. |
+| `WAHOO_CLIENT_SECRET` | `wahoo.py` | Secret | ⬜ TODO | ❓ verify | Wahoo OAuth app secret. |
+| `WAHOO_REDIRECT_URI` / `WAHOO_HOST` | `wahoo.py` | Config | ⬜ optional | — | Default to the prod callback / `https://api.wahooligan.com`. |
+| `HAMMERHEAD_CLIENT_ID` | `hammerhead.py` | Secret | ⬜ TODO | ❓ verify | Hammerhead OAuth app ID. |
+| `HAMMERHEAD_CLIENT_SECRET` | `hammerhead.py` | Secret | ⬜ TODO | ❓ verify | Hammerhead OAuth app secret. |
+| `HAMMERHEAD_REDIRECT_URI` | `hammerhead.py` | Config | ⬜ optional | — | Defaults to the prod callback. |
+| `SUPPORT_EMAIL` | `api/index.py` | Config | ⬜ TODO | ❓ verify | Contact email on `/support`; falls back to the school website. |
 | `STRAVA_ACCESS_TOKEN` | `api/index.py` | Secret | ⬜ optional | ❌ missing | Test-only (`/activities`); not needed in normal operation. |
 
 > **⬜ TODO rows that exist in Vercel**: add them to Infisical `prod/app` so
@@ -156,6 +166,10 @@ No local `.env` is kept. Secrets are injected at runtime from Infisical:
 ```powershell
 infisical run --env=prod --path=/app -- uvicorn api.index:app --reload
 ```
+
+Manual COROS debugging scripts live in `scripts/` (`coros_connect_test.py`,
+`coros_detail_test.py`); run them from the repo root, e.g.
+`infisical run --env=prod --path=/app -- python scripts/coros_detail_test.py`.
 
 Note: because there is only one credential set, local runs use the **live**
 `prod` secrets and therefore talk to the real Strava/Supabase. Prefer read-only
