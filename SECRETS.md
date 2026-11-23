@@ -32,7 +32,7 @@ project `tourdemalborska`.
 - Environments: `prod` (the only populated one), `dev` / `staging` (empty)
 - Folders (in `prod`):
   - `/app`    → application runtime secrets, synced to **Vercel**
-  - `/backup` → backup workflow secrets, synced to **GitHub Actions**
+  - `/backup` → reserved for backup secrets (currently unused, see below)
 
 ### Ownership domains (who manages which Vercel env vars)
 
@@ -46,7 +46,7 @@ the core of the architecture:
    `SUPABASE_ANON/JWT/SECRET/PUBLISHABLE_*`. Auto-managed by the integration —
    Infisical must leave these alone.
 3. **GitHub Actions-owned (backup):** lives in the repo, not Vercel. See
-   `prod/backup` below.
+   the backup section below.
 
 ## `prod/app` — application runtime (synced to Vercel)
 
@@ -123,19 +123,22 @@ Notes:
   dedicated connection string for the restricted `malborska_backup` role — keep
   it separate; do not reuse an integration-managed URL for backups.
 
-## `prod/backup` — backup workflow (synced to GitHub Actions)
+## Backup workflow secrets (managed directly in GitHub)
 
 Consumed by `.github/workflows/backup-supabase.yml` and
-`scripts/backup_supabase.sh`. Folder exists in Infisical but is **empty** — add
-these as GitHub Actions **secrets** via the integration:
+`scripts/backup_supabase.sh`. **Decision:** these are managed directly as GitHub
+Actions **secrets**, NOT synced from Infisical. GitHub cannot reveal stored
+values, so syncing would require rotating all four credentials for little gain.
+The Infisical `/backup` folder is intentionally unused. Revisit when these
+credentials are next rotated (then store the new values in Infisical `prod/backup`
+and enable the GitHub integration).
 
-| Key | Consumed in | In Infisical? | Notes |
+| Key | Consumed in | Where managed | Notes |
 |---|---|---|---|
-| `SUPABASE_DB_URL` | workflow env / `backup_supabase.sh` | ⬜ TODO | Postgres connection string (`malborska_backup` role). |
-| `AWS_ACCESS_KEY_ID` | workflow env | ⬜ TODO | S3 upload credentials. |
-| `AWS_SECRET_ACCESS_KEY` | workflow env | ⬜ TODO | S3 upload credentials. |
-| `NEW_RELIC_LICENSE_KEY` | workflow env | ⬜ TODO | Backup result reporting. |
-
+| `SUPABASE_DB_URL` | workflow env / `backup_supabase.sh` | ✅ GitHub secret | Postgres connection string (`malborska_backup` role). |
+| `AWS_ACCESS_KEY_ID` | workflow env | ✅ GitHub secret | S3 upload credentials. |
+| `AWS_SECRET_ACCESS_KEY` | workflow env | ✅ GitHub secret | S3 upload credentials. |
+| `NEW_RELIC_LICENSE_KEY` | workflow env | ✅ GitHub secret | Backup result reporting. |
 The following are **non-secret** and should stay as GitHub Actions **variables**
 (`vars`), not pushed through Infisical:
 
@@ -151,7 +154,7 @@ The following are **non-secret** and should stay as GitHub Actions **variables**
 Infisical EU · tourdemalborska · prod
 ├── /app     ──push──▶ Vercel env vars      ──▶ FastAPI app at runtime
 │             └─pull── infisical run        ──▶ local development
-└── /backup  ──push──▶ GitHub Actions secrets ─▶ backup-supabase.yml
+└── /backup  (unused; backup secrets live directly in GitHub Actions secrets)
 ```
 
 - **Local dev** and **Vercel** consume `prod/app`.
