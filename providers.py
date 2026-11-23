@@ -23,7 +23,7 @@ from typing import Dict, Any, List, Optional
 
 from config import supabase
 
-PROVIDERS = ("strava", "coros", "garmin", "wahoo")
+PROVIDERS = ("strava", "coros", "garmin", "wahoo", "hammerhead")
 
 
 # -------------------------

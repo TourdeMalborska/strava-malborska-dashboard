@@ -234,6 +234,60 @@ def wahoo_callback(code: str = None, state: str = None, error: str = None):
     return RedirectResponse(url="/auth-success?provider=wahoo", status_code=302)
 
 
+import hammerhead as hammerhead_provider
+
+
+@app.get("/auth/hammerhead")
+def auth_hammerhead(consent: str = None):
+    """Start the Hammerhead (Karoo) OAuth connect flow (confidential client)."""
+    blocked = _consent_required(consent)
+    if blocked:
+        return blocked
+
+    state = providers.save_oauth_state(provider="hammerhead", code_verifier=None)
+    return RedirectResponse(url=hammerhead_provider.build_authorize_url(state=state))
+
+
+@app.get("/auth/hammerhead/callback")
+def hammerhead_callback(code: str = None, state: str = None, error: str = None):
+    """
+    Hammerhead OAuth callback. Validates state, exchanges the code, takes the
+    user id from the token response and links it to a canonical athlete.
+    Hammerhead has no profile endpoint, so new athletes get a placeholder name.
+    """
+    if error or not code or not state:
+        return RedirectResponse(url="/auth-cancelled?provider=hammerhead", status_code=302)
+
+    state_row = providers.consume_oauth_state(state, provider="hammerhead")
+    if not state_row:
+        raise HTTPException(status_code=400, detail="Invalid or expired OAuth state")
+
+    token_data = hammerhead_provider.exchange_code(code=code)
+    hammerhead_user_id = hammerhead_provider.resolve_user_id(token_data)
+
+    existing = providers.find_provider_link("hammerhead", hammerhead_user_id)
+    if existing:
+        athlete_id = existing["athlete_id"]
+    else:
+        athlete_id = providers.create_athlete(
+            hammerhead_provider.placeholder_profile(), source="hammerhead"
+        )
+
+    providers.record_consent(athlete_id)
+
+    providers.link_provider(
+        athlete_id=athlete_id,
+        provider="hammerhead",
+        provider_user_id=hammerhead_user_id,
+        access_token=token_data.get("access_token"),
+        refresh_token=token_data.get("refresh_token"),
+        expires_at_iso=hammerhead_provider.expires_at_from(token_data),
+        scope=token_data.get("scope", hammerhead_provider.HAMMERHEAD_SCOPES),
+    )
+
+    return RedirectResponse(url="/auth-success?provider=hammerhead", status_code=302)
+
+
 from datetime import datetime
 
 
@@ -621,6 +675,7 @@ _PROVIDER_LABELS = {
     "strava": "Strava",
     "coros": "COROS",
     "wahoo": "Wahoo",
+    "hammerhead": "Hammerhead Karoo",
     "garmin": "Garmin Connect",
     "polar": "Polar",
 }

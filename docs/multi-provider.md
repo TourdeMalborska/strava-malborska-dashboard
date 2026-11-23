@@ -310,3 +310,49 @@ the JSON first.
 
 S3 evaluates lifecycle rules once a day, so an object is deleted shortly after
 day 35, not at the exact minute.
+
+## Hammerhead (SRAM) Karoo integration
+
+Source of truth: OpenAPI spec `https://api.hammerhead.io/v1/docs/openapi.yml`.
+Implemented in `hammerhead.py`; provider name `hammerhead`.
+
+- OAuth 2.0 authorization code, confidential client. Authorize
+  `https://api.hammerhead.io/v1/auth/oauth/authorize`, token
+  `.../v1/auth/oauth/token`. The token response includes `user_id`, used as
+  `provider_user_id`. Scope: `activity:read`.
+- Developer account is self-service (Hammerhead Dashboard -> developer settings
+  -> accept the API licence -> API settings tab: client ID/secret, redirect
+  URLs, webhook secret/URLs).
+- Activities: `GET /v1/api/activities?page&perPage(<=100)&startDate` returns
+  summaries (id, name, createdAt, duration, distance). `activityType` (RIDE,
+  GRAVEL, MOUNTAIN_BIKE, EBIKE, EMOUNTAIN_BIKE, VELOMOBILE) is only on the detail
+  endpoint, so each new activity costs one extra call. The detail polyline and
+  description are discarded, never stored.
+- Webhooks exist (HMAC-signed activity notifications) but are not used; the
+  hourly sync polls like the other providers.
+- No profile endpoint: new Hammerhead athletes are created with the placeholder
+  name "Hammerhead (Karoo)".
+
+### Decisions / workarounds
+- `activities.activity_id` is BIGINT but Hammerhead ids are strings
+  (`1000.activity.abcd`). They are mapped to a stable positive 63-bit integer
+  (SHA-256) in `hammerhead.to_activity_id`; the original id is kept in
+  `raw.hammerhead_id`. No primary-key migration needed.
+- Sport mapping: RIDE -> Ride, GRAVEL -> GravelRide, MOUNTAIN_BIKE ->
+  MountainBikeRide (all counted by `is_outdoor_cycling`). EBIKE,
+  EMOUNTAIN_BIKE and VELOMOBILE are stored under their own names and NOT
+  counted.
+- Migration 010 adds `hammerhead` to every provider/source CHECK constraint.
+
+### UNVERIFIED until the first real ride
+- distance assumed metres, duration assumed milliseconds
+  (`DISTANCE_TO_METRES`, `DURATION_TO_SECONDS` in `hammerhead.py`)
+- activity date taken from `createdAt`, which may be the upload time
+
+### Licence notes (API License Agreement, May 22 2025)
+- No restriction on showing data to other users and no retention limit.
+- We are responsible for privacy notices and user consent (consent page covers
+  this).
+- §3(f) forbids combining the API with services "not authorized by Company";
+  combining Karoo rides with other providers in one ranking is worth
+  confirming with hammerhead.integrations@sram.com.

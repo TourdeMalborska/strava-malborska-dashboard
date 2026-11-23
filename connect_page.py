@@ -22,7 +22,7 @@ PROVIDERS = [
     ("Wahoo",            "wahoo",  "/auth/wahoo",  "#1E73BE", "live"),
     ("Garmin Connect",   "garmin", None,           "#007CC3", "soon"),
     ("Polar",            "polar",  None,           "#E4002B", "soon"),
-    ("Hammerhead Karoo", "karoo",  None,           "#111827", "soon"),
+    ("Hammerhead Karoo", "hammerhead", "/auth/hammerhead", "#111827", "live"),
     ("Suunto",           "suunto", None,           "#1A1A1A", "soon"),
 ]
 
