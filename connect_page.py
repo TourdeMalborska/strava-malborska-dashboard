@@ -32,11 +32,21 @@ TEXT = {
         "title": "Tour de Malborska — Połącz urządzenie",
         "tagline": "Połącz swoje konto sportowe, aby dołączyć do klubowego rankingu kilometrów.",
         "need_consent": "Aby kontynuować, zapoznaj się z informacją poniżej i zaznacz zgodę.",
+        "need_profile": "Aby połączyć Hammerhead Karoo, podaj imię, nazwisko i płeć (lub wybierz „Wolę nie podawać”).",
+        "profile_title": "Twoje dane do rankingu",
+        "profile_hint": ("Hammerhead Karoo (i Garmin) nie udostępniają imienia ani płci. Wypełnij te pola "
+                         "tylko, jeśli łączysz Hammerhead Karoo. W pozostałych serwisach pobierzemy te dane "
+                         "z Twojego konta."),
+        "first_name": "Imię",
+        "last_name": "Nazwisko",
+        "sex": "Płeć",
+        "sex_options": [("", "Wybierz…"), ("F", "Kobieta"), ("M", "Mężczyzna"), ("N", "Wolę nie podawać")],
         "consent_title": "Zanim połączysz konto",
         "consent_intro": "Przeczytaj, jak przetwarzamy Twoje dane:",
         "items": [
             ("Jakie dane pobieramy:",
              "imię i nazwisko (lub pseudonim) z Twojego konta, płeć (jeśli jest podana) "
+             "— a jeśli dostawca ich nie udostępnia (np. Hammerhead Karoo), dane wpisane przez Ciebie na tej stronie, "
              "oraz dla każdej aktywności: datę, rodzaj sportu, dystans, czas ruchu, nazwę "
              "i informację, czy została wpisana ręcznie."),
             ("Jak je pobieramy:",
@@ -80,11 +90,21 @@ TEXT = {
         "title": "Tour de Malborska — Connect your device",
         "tagline": "Connect your sports account to join the club's kilometre ranking.",
         "need_consent": "To continue, read the information below and tick the consent box.",
+        "need_profile": "To connect Hammerhead Karoo, enter your first name, last name and sex (or choose “Prefer not to say”).",
+        "profile_title": "Your ranking details",
+        "profile_hint": ("Hammerhead Karoo (and Garmin) do not share your name or sex. Fill in these fields "
+                         "only if you are connecting Hammerhead Karoo. For other providers we read them "
+                         "from your account."),
+        "first_name": "First name",
+        "last_name": "Last name",
+        "sex": "Sex",
+        "sex_options": [("", "Select…"), ("F", "Female"), ("M", "Male"), ("N", "Prefer not to say")],
         "consent_title": "Before you connect",
         "consent_intro": "Please read how we process your data:",
         "items": [
             ("What we collect:",
-             "your name (or nickname) from your account, sex (if provided), and for each "
+             "your name (or nickname) from your account, sex (if provided) — or, if the provider "
+             "does not share them (e.g. Hammerhead Karoo), what you enter on this page — and for each "
              "activity: date, sport type, distance, moving time, name, and whether it was "
              "entered manually."),
             ("How we collect it:",
@@ -138,8 +158,9 @@ def _button(label, color, path, status, t, slug=""):
             f'height="{STRAVA_BUTTON_HEIGHT_PX}"></button>'
         )
     if status == "live" and path:
+        method = ' formmethod="post"' if slug == "hammerhead" else ""
         return (
-            f'<button class="btn" type="submit" formaction="{path}" style="--brand:{color}">'
+            f'<button class="btn" type="submit" formaction="{path}"{method} style="--brand:{color}">'
             f'<span class="btn-label">{t["connect"]} {label}</span>'
             f'<span class="btn-arrow" aria-hidden="true">&rarr;</span></button>'
         )
@@ -151,7 +172,8 @@ def _button(label, color, path, status, t, slug=""):
     )
 
 
-def render_connect_page(lang: str = "pl", need_consent: bool = False) -> str:
+def render_connect_page(lang: str = "pl", need_consent: bool = False,
+                        need_profile: bool = False) -> str:
     lang = "en" if lang == "en" else "pl"
     t = TEXT[lang]
     other_label, other_href = t["other_lang"]
@@ -163,6 +185,11 @@ def render_connect_page(lang: str = "pl", need_consent: bool = False) -> str:
         f"<li><strong>{b}</strong> {txt}</li>" for (b, txt) in t["items"]
     )
     notice = f'<div class="notice" role="alert">{t["need_consent"]}</div>' if need_consent else ""
+    if need_profile:
+        notice += f'<div class="notice" role="alert">{t["need_profile"]}</div>'
+    sex_options = "".join(
+        f'<option value="{v}">{label}</option>' for (v, label) in t["sex_options"]
+    )
     support_href = "/support?lang=en" if lang == "en" else "/support"
 
     page = """<!DOCTYPE html>
@@ -215,6 +242,11 @@ def render_connect_page(lang: str = "pl", need_consent: bool = False) -> str:
     .consent a { color: var(--brand-red); }
     .check { display: flex; gap: 10px; align-items: flex-start; margin: 14px 0 16px; padding: 12px; border: 1px solid var(--ring); border-radius: 12px; background: #fcfcfc; font-size: 0.86rem; line-height: 1.45; cursor: pointer; }
     .check input { width: 20px; height: 20px; margin: 2px 0 0; flex: 0 0 auto; accent-color: var(--brand-red); }
+    .profile { margin: 14px 0 0; padding: 12px; border: 1px solid var(--ring); border-radius: 12px; background: #fcfcfc; }
+    .profile h2 { font-family: 'Montserrat', sans-serif; font-size: 0.95rem; font-weight: 700; margin: 0 0 4px; }
+    .profile p { margin: 0 0 10px; color: var(--muted); font-size: 0.82rem; line-height: 1.45; }
+    .profile label { display: block; font-size: 0.82rem; font-weight: 500; margin: 8px 0 4px; }
+    .profile input, .profile select { width: 100%; padding: 11px 12px; font: inherit; font-size: 1rem; border: 1px solid var(--ring); border-radius: 10px; background: #fff; color: var(--text); }
     .list { display: flex; flex-direction: column; gap: 12px; }
     .btn {
       display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -264,6 +296,18 @@ __ITEMS__
         <p class="more">__MORE__ <a href="__SUPPORT_HREF__">__SUPPORT__</a></p>
       </section>
 
+      <section class="profile" aria-labelledby="profile-h">
+        <h2 id="profile-h">__PROFILE_TITLE__</h2>
+        <p>__PROFILE_HINT__</p>
+        <label for="first_name">__FIRST_NAME__</label>
+        <input id="first_name" name="first_name" type="text" maxlength="50" autocomplete="given-name">
+        <label for="last_name">__LAST_NAME__</label>
+        <input id="last_name" name="last_name" type="text" maxlength="50" autocomplete="family-name">
+        <label for="sex">__SEX__</label>
+        <select id="sex" name="sex">__SEX_OPTIONS__</select>
+        <input type="hidden" name="lang" value="__HTML_LANG__">
+      </section>
+
       <label class="check">
         <input type="checkbox" name="consent" value="1" required>
         <span>__CHECK__</span>
@@ -297,6 +341,12 @@ __ITEMS__
         "__SUPPORT__": t["support"],
         "__CHECK__": t["check"],
         "__BUTTONS__": buttons,
+        "__PROFILE_TITLE__": t["profile_title"],
+        "__PROFILE_HINT__": t["profile_hint"],
+        "__FIRST_NAME__": t["first_name"],
+        "__LAST_NAME__": t["last_name"],
+        "__SEX__": t["sex"],
+        "__SEX_OPTIONS__": sex_options,
         "__FOOTER__": t["footer"],
         "__OTHER_HREF__": other_href,
         "__OTHER_LABEL__": other_label,
