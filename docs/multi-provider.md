@@ -175,14 +175,26 @@ Consequence for a distance ranking:
   more work (binary parsing); only pursue if native-device coverage proves
   insufficient.
 
-### Wahoo workout_type_id mapping (from live data)
+### Wahoo workout_type_id -> sport_type mapping
 
-- `0`  = outdoor cycling  -> counts toward the ranking
-- `1`  = running
-- `12` = MyWhoosh / indoor-virtual ride -> EXCLUDED (simulated distance)
-- `26` = swimming
-Refine against Wahoo's full workout-type reference as needed.
+`wahoo.py` (`WAHOO_SPORT_TYPE_MAP`) converts Wahoo's numeric `workout_type_id`
+into the canonical names used by `public.is_outdoor_cycling()`. Before this, the
+raw id was stored as text (`"0"`), which the SQL list does not contain, so no
+Wahoo ride was counted toward the ranking. The original id stays in
+`raw.workout.workout_type_id`.
 
+| Wahoo id | Wahoo name | Stored as | Counted |
+|---|---|---|---|
+| 0, 15, 11, 14, 16 | BIKING, ROAD, CYCLECROSS, RECUMBENT, TRACK | `Ride` | yes |
+| 13 | BIKING_MOUNTAIN | `MountainBikeRide` | yes |
+| 64 | EBIKING | `EBikeRide` | no (same as Strava/Hammerhead) |
+| 70 | HANDCYCLING | `Handcycle` | no |
+| 12, 21, 49, 61, 68 | indoor / trainer / virtual | `VirtualRide` | no (simulated distance) |
+| anything else (1 running, 26 swimming, 17 motorcycling, ...) | | raw id as text | no |
+
+Full list: https://cloud-api.wahooligan.com/ ("Workout Types"). Rows saved
+before this change still hold the raw id (e.g. `"0"`); they need a one-off
+backfill (see the PR notes) and are not corrected by a normal sync.
 ## Backlog: post-authorization UX
 
 After a successful provider authorization, the app currently returns the user
