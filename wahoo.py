@@ -47,10 +47,38 @@ WAHOO_REDIRECT_URI = os.getenv(
     "https://tourdemalborska.vercel.app/auth/wahoo/callback",
 )
 
-# Wahoo workout_type_id values treated as OUTDOOR cycling. Refine against the
-# live workout-type reference; indoor/virtual rides are excluded (simulated
-# distance must not count toward the ranking).
-WAHOO_CYCLING_TYPE_IDS = {0, 40}
+# Wahoo workout_type_id -> our canonical sport_type (Strava's names), so that
+# public.is_outdoor_cycling() counts Wahoo rides like any other provider.
+# Reference: https://cloud-api.wahooligan.com/ ("Workout Types").
+#
+# COUNTED (names in is_outdoor_cycling): Ride, GravelRide, MountainBikeRide.
+# Indoor/virtual rides are mapped to VirtualRide and NOT counted (simulated
+# distance). E-bikes and handcycling get their own names and are NOT counted,
+# matching the Strava/Hammerhead decision. Anything not listed (running,
+# swimming, motorcycling = 17, ...) keeps its raw id as text and is NOT counted.
+WAHOO_SPORT_TYPE_MAP = {
+    0: "Ride",              # BIKING (outdoor)
+    15: "Ride",             # BIKING_ROAD
+    11: "Ride",             # BIKING_CYCLECROSS
+    14: "Ride",             # BIKING_RECUMBENT
+    16: "Ride",             # BIKING_TRACK
+    13: "MountainBikeRide", # BIKING_MOUNTAIN
+    64: "EBikeRide",        # EBIKING
+    70: "Handcycle",        # HANDCYCLING
+    12: "VirtualRide",      # BIKING_INDOOR
+    21: "VirtualRide",      # FE_BIKE
+    49: "VirtualRide",      # BIKING_INDOOR_CYCLING_CLASS
+    61: "VirtualRide",      # BIKING_INDOOR_TRAINER
+    68: "VirtualRide",      # BIKING_INDOOR_VIRTUAL
+}
+
+
+def map_sport_type(workout_type_id: Any) -> str:
+    """Wahoo workout_type_id -> canonical sport_type; unknown ids stay as text."""
+    try:
+        return WAHOO_SPORT_TYPE_MAP.get(int(workout_type_id), str(workout_type_id))
+    except (TypeError, ValueError):
+        return str(workout_type_id)
 
 
 # -------------------------
@@ -265,7 +293,7 @@ def normalize_activity(workout: Dict[str, Any], summary: Dict[str, Any]) -> Dict
         "activity_date": activity_date,
         "distance": distance,            # metres
         "moving_time": moving_time,      # seconds
-        "sport_type": str(workout.get("workout_type_id")),
+        "sport_type": map_sport_type(workout.get("workout_type_id")),
         "activity_name": workout.get("name"),
         "manual": manual,
         "raw": {"workout": workout, "summary": summary},
