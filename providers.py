@@ -66,6 +66,41 @@ def create_athlete(profile: Dict[str, Any], source: str) -> str:
     return result.data[0]["athlete_id"]
 
 
+_MAX_NAME_LEN = 50
+_SEX_CHOICES = {"M": "M", "F": "F", "N": None}  # N = prefer not to say
+
+
+def clean_profile_input(firstname: Optional[str], lastname: Optional[str],
+                        sex: Optional[str]) -> Optional[Dict[str, Any]]:
+    """
+    Validate user-typed profile fields (providers that expose no name/sex).
+    Returns {"firstname", "lastname", "sex"} or None if anything is invalid.
+    sex must be one of M / F / N (N = prefer not to say, stored as NULL).
+    """
+    def _name(value: Optional[str]) -> Optional[str]:
+        value = " ".join((value or "").split())  # trim + collapse whitespace
+        if not value or len(value) > _MAX_NAME_LEN:
+            return None
+        if any(ch in value for ch in "<>") or any(ord(ch) < 32 for ch in value):
+            return None
+        return value
+
+    first, last = _name(firstname), _name(lastname)
+    if first is None or last is None or sex not in _SEX_CHOICES:
+        return None
+    return {"firstname": first, "lastname": last, "sex": _SEX_CHOICES[sex]}
+
+
+def update_athlete_profile(athlete_id: str, profile: Dict[str, Any]) -> None:
+    """Overwrite name/sex on an existing athlete (user-entered, on reconnect)."""
+    supabase.table("athletes").update({
+        "firstname": profile.get("firstname"),
+        "lastname": profile.get("lastname"),
+        "sex": profile.get("sex"),
+        "updated_at": _now_iso(),
+    }).eq("athlete_id", athlete_id).execute()
+
+
 def record_consent(athlete_id: str) -> None:
     """
     Stamp the moment the athlete accepted the current consent text on the
@@ -297,17 +332,25 @@ def save_oauth_state(
     code_verifier: str,
     athlete_id: Optional[str] = None,
     redirect_after: Optional[str] = None,
+    profile: Optional[Dict[str, Any]] = None,
 ) -> str:
-    """Create a CSRF state tied to a PKCE verifier; return the state token."""
+    """Create a CSRF state tied to a PKCE verifier; return the state token.
+
+    `profile` carries user-entered name/sex through the OAuth round trip for
+    providers that expose none (see migration 011).
+    """
     state = secrets.token_urlsafe(32)
-    supabase.table("oauth_states").insert({
+    row = {
         "state": state,
         "provider": provider,
         "code_verifier": code_verifier,
         "athlete_id": athlete_id,
         "redirect_after": redirect_after,
         "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat(),
-    }).execute()
+    }
+    if profile is not None:
+        row["profile"] = profile
+    supabase.table("oauth_states").insert(row).execute()
     return state
 
 

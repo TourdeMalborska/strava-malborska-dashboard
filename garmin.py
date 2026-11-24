@@ -30,7 +30,7 @@ Activity JSON (real fields used):
 import os
 import time
 import requests
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone, timedelta
 
 import providers
@@ -180,27 +180,30 @@ def save_activities(activities: List[Dict[str, Any]], athlete_id: str) -> Dict[s
 # -------------------------
 # Personal API link bootstrap (pilot)
 # -------------------------
-def ensure_personal_link() -> Dict[str, Any]:
+def ensure_personal_link(profile: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
     Ensure an athlete_providers row exists for the Personal-API Garmin account,
     creating a canonical athlete on first run. Returns the link row.
 
     Keyed by the real Garmin account id (profile displayName GUID). The Personal
-    API does not expose firstname/lastname, so the canonical athlete keeps a
-    placeholder name ("Garmin" / "(Personal API)"); it can be edited later. The
-    API key stays in Infisical, not the DB — the bearer token is derived on
-    demand at sync time.
+    API does not expose firstname/lastname or sex, so pass them in `profile`
+    (as validated by providers.clean_profile_input). Without a profile the
+    athlete keeps a placeholder name ("Garmin" / "(Personal API)"). If the link
+    already exists, a given profile corrects the athlete row. The API key stays
+    in Infisical, not the DB — the bearer token is derived on demand at sync
+    time.
     """
     access_token = obtain_token()
     account_id = get_account_id(access_token)
 
     existing = providers.find_provider_link("garmin", account_id)
     if existing:
+        if profile:
+            providers.update_athlete_profile(existing["athlete_id"], profile)
         return existing
 
     # First run: create a canonical athlete for the Personal API owner.
-    # Garmin provides no human name via this API, so keep a placeholder.
-    athlete_id = providers.create_athlete({
+    athlete_id = providers.create_athlete(profile or {
         "firstname": "Garmin",
         "lastname": "(Personal API)",
     }, source="garmin")

@@ -37,11 +37,13 @@ class StatusResponse(BaseModel):
 	status: str
 
 @app.get("/", response_class=HTMLResponse)
-def root(lang: str = "pl", need_consent: str = None):
+def root(lang: str = "pl", need_consent: str = None, need_profile: str = None):
     # Athlete-facing connect page (mobile-first) with the consent step.
     # Monitoring/health checks should target /health (JSON) or /status, not /.
     from connect_page import render_connect_page
-    return render_connect_page(lang=lang, need_consent=bool(need_consent))
+    return render_connect_page(
+        lang=lang, need_consent=bool(need_consent), need_profile=bool(need_profile)
+    )
 
 
 @app.get("/support", response_class=HTMLResponse)
@@ -238,14 +240,41 @@ import hammerhead as hammerhead_provider
 
 
 @app.get("/auth/hammerhead")
-def auth_hammerhead(consent: str = None):
-    """Start the Hammerhead (Karoo) OAuth connect flow (confidential client)."""
-    blocked = _consent_required(consent)
+def auth_hammerhead_get():
+    """
+    The connect page now POSTs here (name/sex must not travel in the URL).
+    A plain GET (stale page, bookmark) is sent back to the connect page.
+    """
+    return RedirectResponse(url="/?need_profile=1", status_code=302)
+
+
+@app.post("/auth/hammerhead")
+async def auth_hammerhead(request: Request):
+    """
+    Start the Hammerhead (Karoo) OAuth connect flow (confidential client).
+    Hammerhead exposes no name or sex, so the athlete enters them on the
+    connect page; they are validated here and carried through the OAuth
+    round trip on the oauth_states row.
+    """
+    form = await request.form()
+    lang = "en" if form.get("lang") == "en" else "pl"
+
+    blocked = _consent_required(form.get("consent"))
     if blocked:
         return blocked
 
-    state = providers.save_oauth_state(provider="hammerhead", code_verifier=None)
-    return RedirectResponse(url=hammerhead_provider.build_authorize_url(state=state))
+    profile = providers.clean_profile_input(
+        form.get("first_name"), form.get("last_name"), form.get("sex")
+    )
+    if profile is None:
+        return RedirectResponse(url=f"/?need_profile=1&lang={lang}", status_code=303)
+
+    state = providers.save_oauth_state(
+        provider="hammerhead", code_verifier=None, profile=profile
+    )
+    return RedirectResponse(
+        url=hammerhead_provider.build_authorize_url(state=state), status_code=303
+    )
 
 
 @app.get("/auth/hammerhead/callback")
@@ -265,12 +294,19 @@ def hammerhead_callback(code: str = None, state: str = None, error: str = None):
     token_data = hammerhead_provider.exchange_code(code=code)
     hammerhead_user_id = hammerhead_provider.resolve_user_id(token_data)
 
+    # Name/sex typed by the athlete on the connect page (None only for an OAuth
+    # round trip started before this change; then the placeholder is used).
+    entered = state_row.get("profile")
+
     existing = providers.find_provider_link("hammerhead", hammerhead_user_id)
     if existing:
         athlete_id = existing["athlete_id"]
+        if entered:
+            # Reconnect: the athlete just told us who they are, so correct the row.
+            providers.update_athlete_profile(athlete_id, entered)
     else:
         athlete_id = providers.create_athlete(
-            hammerhead_provider.placeholder_profile(), source="hammerhead"
+            entered or hammerhead_provider.placeholder_profile(), source="hammerhead"
         )
 
     providers.record_consent(athlete_id)
