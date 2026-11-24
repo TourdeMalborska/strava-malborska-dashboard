@@ -142,6 +142,18 @@ def resolve_user_id(access_token: str) -> str:
     return str(uid)
 
 
+def map_gender(value: Any) -> Optional[str]:
+    """Wahoo user.gender -> 'M' / 'F' (the convention used by Strava/COROS).
+
+    Wahoo: 0 = male, 1 = female, 2 = other, 3 = prefer not to say. Only 0 and 1
+    map to a ranking category; anything else (or missing) stays None.
+    """
+    try:
+        return {0: "M", 1: "F"}.get(int(value))
+    except (TypeError, ValueError):
+        return None
+
+
 def fetch_profile(access_token: str) -> Dict[str, Any]:
     try:
         user = get_user(access_token)
@@ -149,10 +161,11 @@ def fetch_profile(access_token: str) -> Dict[str, Any]:
             "firstname": user.get("first"),
             "lastname": user.get("last"),
             "email": user.get("email"),
+            "sex": map_gender(user.get("gender")),
         }
     except Exception as e:
         print(f"[wahoo] profile fetch failed, minimal athlete: {e}")
-        return {"firstname": None, "lastname": None, "email": None}
+        return {"firstname": None, "lastname": None, "email": None, "sex": None}
 
 
 # -------------------------
